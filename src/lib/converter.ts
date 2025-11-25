@@ -1,7 +1,7 @@
 export interface ConversionSettings {
-  colorSimplificatio
-}
-export interface Conver
+  complexity: number
+  colorSimplification: number
+  pathSmoothing: number
 }
 
 export interface ConversionJob {
@@ -14,53 +14,37 @@ export interface ConversionJob {
   pngDataUrl: string
   svgDataUrl: string
   status?: 'pending' | 'processing' | 'completed' | 'failed'
-  id: string
- 
+  error?: string
+}
 
-  status: 'pending' | 'processing' | 
-
+export async function convertImageToSvg(
   file: File,
-): Promise<{ svgData
-    const timeoutId = se
+  settings: ConversionSettings
+): Promise<{ svgDataUrl: string; svgSize: number }> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Image conversion timed out after 30 seconds'))
     }, 30000)
-    const reader = new 
+
+    const reader = new FileReader()
+    
     reader.onload = (e) => {
- 
-
-        }
-        const
-        img.onload = () => {
-            if (!img.width || !img.height) {
-              reject(new Error('Invalid ima
-            }
-            if (img.width > 10000 || img.height > 10000) {
-             
-
-            const canvas = document
-
-              clearTimeout(t
-           
-
-            canvas.height = img.h
-            ctx.drawImage(img, 0, 0)
-            cons
-         
-
-              return
+      try {
+        const img = new Image()
         
-            const svgDataUrl
-            cle
-              svgDataUrl,
-            })
-            clearTimeout(timeoutId)
-          }
+        img.onload = () => {
+          try {
+            if (!img.width || !img.height) {
+              clearTimeout(timeoutId)
+              reject(new Error('Invalid image dimensions'))
+              return
+            }
 
-
-        }
-        img.src = e.target.result as 
-        clearTimeout(timeoutId)
-      }
-
+            if (img.width > 10000 || img.height > 10000) {
+              clearTimeout(timeoutId)
+              reject(new Error('Image dimensions too large (max 10000x10000)'))
+              return
+            }
 
             const canvas = document.createElement('canvas')
             const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -104,7 +88,7 @@ export interface ConversionJob {
           reject(new Error('Failed to load image. File may be corrupted or in an unsupported format.'))
         }
         
-        img.src = e.target.result as string
+        img.src = e.target?.result as string
       } catch (error) {
         clearTimeout(timeoutId)
         reject(new Error(`File processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`))
@@ -510,8 +494,9 @@ export function downloadAllAsZip(jobs: ConversionJob[]): void {
     if (job.status === 'completed' && job.svgDataUrl) {
       const a = document.createElement('a')
       a.href = job.svgDataUrl
-
-
-
-
+      a.download = job.filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.svg')
+      a.click()
+    }
+  })
+}
 
