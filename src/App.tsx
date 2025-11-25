@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,9 @@ import {
   Warning,
   MagnifyingGlassPlus,
   MagnifyingGlassMinus,
+  ArrowsLeftRight,
+  ArrowCounterClockwise,
+  Command,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -32,6 +35,14 @@ import {
 } from '@/lib/converter'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
+import { usePinchZoom } from '@/hooks/use-pinch-zoom'
+import { DraggableDivider } from '@/components/DraggableDivider'
+
+interface SettingsHistoryEntry {
+  settings: ConversionSettings
+  timestamp: number
+}
 
 function App() {
   const isMobile = useIsMobile()
@@ -42,13 +53,66 @@ function App() {
   const [progress, setProgress] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [dividerPosition, setDividerPosition] = useState(50)
   const [settings, setSettings] = useState<ConversionSettings>({
     complexity: 0.5,
     colorSimplification: 0.5,
     pathSmoothing: 0.5,
   })
+  const [settingsHistory, setSettingsHistory] = useState<SettingsHistoryEntry[]>([])
+  const [settingsHistoryIndex, setSettingsHistoryIndex] = useState(-1)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [hasPinchedBefore, setHasPinchedBefore] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+
+  usePinchZoom(previewRef, {
+    onZoomChange: (delta) => {
+      if (!hasPinchedBefore) {
+        setHasPinchedBefore(true)
+        toast.info('Pinch to zoom', {
+          description: 'Use two fingers to zoom in and out',
+        })
+      }
+      setZoomLevel((prev) => {
+        const newZoom = prev + delta
+        const clampedZoom = Math.max(0.5, Math.min(3, newZoom))
+        if (clampedZoom === prev && (delta > 0 ? clampedZoom >= 3 : clampedZoom <= 0.5)) {
+          return prev
+        }
+        return clampedZoom
+      })
+    },
+    enabled: isMobile && !!currentJob,
+  })
+
+  const addToSettingsHistory = useCallback((newSettings: ConversionSettings) => {
+    setSettingsHistory((current) => {
+      const newHistory = current.slice(0, settingsHistoryIndex + 1)
+      return [...newHistory, { settings: newSettings, timestamp: Date.now() }]
+    })
+    setSettingsHistoryIndex((current) => current + 1)
+  }, [settingsHistoryIndex])
+
+  const undoSettings = useCallback(() => {
+    if (settingsHistoryIndex > 0) {
+      const newIndex = settingsHistoryIndex - 1
+      setSettingsHistoryIndex(newIndex)
+      setSettings(settingsHistory[newIndex].settings)
+      toast.info('Settings undone')
+    }
+  }, [settingsHistoryIndex, settingsHistory])
+
+  const redoSettings = useCallback(() => {
+    if (settingsHistoryIndex < settingsHistory.length - 1) {
+      const newIndex = settingsHistoryIndex + 1
+      setSettingsHistoryIndex(newIndex)
+      setSettings(settingsHistory[newIndex].settings)
+      toast.info('Settings redone')
+    }
+  }, [settingsHistoryIndex, settingsHistory])
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -71,7 +135,7 @@ function App() {
       setProgress(0)
 
       try {
-        const progressInterval = setInterval(() => {
+        progressIntervalRef.current = setInterval(() => {
           setProgress((prev) => Math.min(prev + Math.random() * 15, 90))
         }, 200)
 
@@ -83,7 +147,9 @@ function App() {
 
         const { svgDataUrl, svgSize } = await convertPngToSvg(file, settings)
 
-        clearInterval(progressInterval)
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current)
+        }
         setProgress(100)
 
         const job: ConversionJob = {
@@ -154,9 +220,11 @@ function App() {
 
   const handleSettingChange = useCallback(
     (key: keyof ConversionSettings, value: number) => {
-      setSettings((prev) => ({ ...prev, [key]: value }))
+      const newSettings = { ...settings, [key]: value }
+      setSettings(newSettings)
+      addToSettingsHistory(newSettings)
     },
-    []
+    [settings, addToSettingsHistory]
   )
 
   const handleZoomIn = useCallback(() => {
@@ -165,6 +233,11 @@ function App() {
 
   const handleZoomOut = useCallback(() => {
     setZoomLevel((prev) => Math.max(prev - 0.25, 0.5))
+  }, [])
+
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1)
+    toast.info('Zoom reset to 100%')
   }, [])
 
   const getSizeReduction = useCallback((job: ConversionJob) => {
@@ -179,6 +252,31 @@ function App() {
     toast.info('Loaded from history', {
       description: job.filename,
     })
+  }, [])
+
+  useKeyboardShortcuts(
+    {
+      onUpload: () => fileInputRef.current?.click(),
+      onDownload: () => currentJob && handleDownload(currentJob),
+      onZoomIn: handleZoomIn,
+      onZoomOut: handleZoomOut,
+      onZoomReset: handleZoomReset,
+      onUndo: undoSettings,
+      onRedo: redoSettings,
+    },
+    !isProcessing
+  )
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '?' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setShowShortcuts((prev) => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   return (
@@ -324,18 +422,26 @@ function App() {
                                 onClick={handleZoomOut}
                                 disabled={zoomLevel <= 0.5}
                                 className="h-8 w-8 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                                title="Zoom out (Cmd/Ctrl + -)"
                               >
                                 <MagnifyingGlassMinus className="w-4 h-4" />
                               </Button>
-                              <span className="text-xs text-muted-foreground min-w-[3rem] text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleZoomReset}
+                                className="text-xs text-muted-foreground min-w-[3rem] min-h-[44px] md:min-h-0 hover:text-foreground transition-colors"
+                                title="Reset zoom (Cmd/Ctrl + 0)"
+                              >
                                 {Math.round(zoomLevel * 100)}%
-                              </span>
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleZoomIn}
                                 disabled={zoomLevel >= 3}
                                 className="h-8 w-8 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                                title="Zoom in (Cmd/Ctrl + +)"
                               >
                                 <MagnifyingGlassPlus className="w-4 h-4" />
                               </Button>
@@ -343,34 +449,87 @@ function App() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Original PNG
-                            </p>
-                            <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden">
-                              <motion.img
-                                src={currentJob.pngDataUrl}
-                                alt="Original"
-                                className="max-w-full max-h-full object-contain"
-                                style={{ transform: `scale(${zoomLevel})` }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                              />
+                        <div className="relative">
+                          <div className="hidden md:block">
+                            <div className="relative h-[500px] rounded-lg border border-border bg-muted/30 overflow-hidden">
+                              <div className="absolute inset-0 flex">
+                                <div
+                                  className="relative overflow-hidden"
+                                  style={{ width: `${dividerPosition}%` }}
+                                >
+                                  <div className="absolute inset-0 p-4 flex items-center justify-center">
+                                    <motion.img
+                                      src={currentJob.pngDataUrl}
+                                      alt="Original"
+                                      className="max-w-full max-h-full object-contain"
+                                      style={{ transform: `scale(${zoomLevel})` }}
+                                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                    />
+                                  </div>
+                                  <div className="absolute top-2 left-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                      Original PNG
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                <DraggableDivider
+                                  defaultPosition={dividerPosition}
+                                  onPositionChange={setDividerPosition}
+                                />
+
+                                <div
+                                  className="relative overflow-hidden"
+                                  style={{ width: `${100 - dividerPosition}%` }}
+                                >
+                                  <div className="absolute inset-0 p-4 flex items-center justify-center">
+                                    <motion.img
+                                      src={currentJob.svgDataUrl}
+                                      alt="Converted"
+                                      className="max-w-full max-h-full object-contain"
+                                      style={{ transform: `scale(${zoomLevel})` }}
+                                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                    />
+                                  </div>
+                                  <div className="absolute top-2 right-2">
+                                    <Badge variant="default" className="bg-cyan text-white text-xs">
+                                      Converted SVG
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Converted SVG
-                            </p>
-                            <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden">
-                              <motion.img
-                                src={currentJob.svgDataUrl}
-                                alt="Converted"
-                                className="max-w-full max-h-full object-contain"
-                                style={{ transform: `scale(${zoomLevel})` }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                              />
+                          <div className="grid grid-cols-1 md:hidden gap-3" ref={previewRef}>
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Original PNG
+                              </p>
+                              <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none">
+                                <motion.img
+                                  src={currentJob.pngDataUrl}
+                                  alt="Original"
+                                  className="max-w-full max-h-full object-contain"
+                                  style={{ transform: `scale(${zoomLevel})` }}
+                                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Converted SVG
+                              </p>
+                              <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none">
+                                <motion.img
+                                  src={currentJob.svgDataUrl}
+                                  alt="Converted"
+                                  className="max-w-full max-h-full object-contain"
+                                  style={{ transform: `scale(${zoomLevel})` }}
+                                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -511,9 +670,33 @@ function App() {
                   </Sheet>
                 ) : (
                   <Card className="p-6">
-                    <div className="flex items-center gap-2 mb-6">
-                      <SlidersHorizontal className="w-5 h-5 text-primary" weight="bold" />
-                      <h3 className="text-lg font-semibold">Settings</h3>
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-2">
+                        <SlidersHorizontal className="w-5 h-5 text-primary" weight="bold" />
+                        <h3 className="text-lg font-semibold">Settings</h3>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={undoSettings}
+                          disabled={settingsHistoryIndex <= 0}
+                          title="Undo settings (Cmd/Ctrl + Z)"
+                          className="h-8 w-8"
+                        >
+                          <ArrowCounterClockwise className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={redoSettings}
+                          disabled={settingsHistoryIndex >= settingsHistory.length - 1}
+                          title="Redo settings (Cmd/Ctrl + Shift + Z)"
+                          className="h-8 w-8"
+                        >
+                          <ArrowCounterClockwise className="w-4 h-4" style={{ transform: 'scaleX(-1)' }} />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-6">
@@ -752,13 +935,101 @@ function App() {
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 text-xs md:text-sm text-muted-foreground">
             <p>© 2024 VectorForge. Professional-quality SVG conversion.</p>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-cyan" weight="bold" />
-              <span>Ready to convert</span>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className="flex items-center gap-2 hover:text-foreground transition-colors"
+              >
+                <Command className="w-4 h-4" weight="bold" />
+                <span>Keyboard shortcuts</span>
+              </button>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-cyan" weight="bold" />
+                <span>Ready to convert</span>
+              </div>
             </div>
           </div>
         </div>
       </footer>
+
+      <AnimatePresence>
+        {showShortcuts && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowShortcuts(false)}
+          >
+            <motion.div
+              className="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowShortcuts(false)}
+                  className="h-8 w-8"
+                >
+                  ×
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Upload file</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + O
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Download SVG</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + S
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Zoom in</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + =
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Zoom out</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + -
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Reset zoom</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + 0
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Undo settings</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + Z
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Redo settings</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} + Shift + Z
+                  </Badge>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -114,14 +114,97 @@ This document details the improvements made to align the VectorForge application
 7. Test with various PNG file sizes and complexities
 
 ## Future Enhancement Opportunities
-1. Add pinch-to-zoom gesture support on mobile
-2. Implement draggable divider for split-view comparison
+1. ~~Add pinch-to-zoom gesture support on mobile~~ ✅ IMPLEMENTED
+2. ~~Implement draggable divider for split-view comparison~~ ✅ IMPLEMENTED
 3. Add haptic feedback for mobile interactions
 4. Implement progressive image loading for large files
-5. Add undo/redo functionality for settings
-6. Enable keyboard shortcuts for power users
+5. ~~Add undo/redo functionality for settings~~ ✅ IMPLEMENTED
+6. ~~Enable keyboard shortcuts for power users~~ ✅ IMPLEMENTED
 7. Add batch conversion support
 8. Implement image cropping before conversion
+
+## Latest Improvements (Iteration 2)
+
+### 1. Draggable Split-View Comparison ✅
+- **Desktop Feature**: Implemented interactive draggable divider for side-by-side comparison
+- **Visual Feedback**: Divider shows handle icon and highlights on hover/drag
+- **Smooth Animation**: Spring physics for natural divider movement
+- **Mobile Alternative**: Stacked vertical layout for mobile devices
+- **Badge Indicators**: Labeled "Original PNG" and "Converted SVG" badges on preview areas
+
+### 2. Keyboard Shortcuts for Power Users ✅
+- **File Operations**:
+  - `Cmd/Ctrl + O`: Upload new file
+  - `Cmd/Ctrl + S`: Download current SVG
+- **Zoom Controls**:
+  - `Cmd/Ctrl + =`: Zoom in
+  - `Cmd/Ctrl + -`: Zoom out
+  - `Cmd/Ctrl + 0`: Reset zoom to 100%
+- **Settings History**:
+  - `Cmd/Ctrl + Z`: Undo settings change
+  - `Cmd/Ctrl + Shift + Z`: Redo settings change
+- **Help Modal**: Accessible via footer link or keyboard
+- **Custom Hook**: Created `useKeyboardShortcuts` hook for clean implementation
+
+### 3. Undo/Redo for Settings ✅
+- **Settings History**: Tracks all settings adjustments with timestamps
+- **Visual Controls**: Undo/Redo buttons in settings panel header
+- **State Management**: Maintains history index for navigation
+- **Keyboard Support**: Integrated with Cmd/Ctrl+Z shortcuts
+- **Toast Notifications**: Confirms undo/redo actions
+
+### 4. Pinch-to-Zoom on Mobile ✅
+- **Touch Gesture**: Two-finger pinch gesture for intuitive zoom control
+- **Custom Hook**: Created `usePinchZoom` hook for reusable gesture handling
+- **Smooth Updates**: Real-time zoom adjustment during pinch
+- **Zoom Limits**: Constrained between 50% and 300% like button controls
+- **Touch Prevention**: Prevents default browser zoom behavior
+- **Mobile Only**: Enabled exclusively on mobile devices with active preview
+
+### 5. Enhanced User Experience ✅
+- **Clickable Zoom Display**: Middle zoom percentage now acts as reset button
+- **Tooltip Titles**: Added helpful tooltips to all control buttons
+- **Improved Accessibility**: Clear visual hierarchy and button states
+- **Keyboard Shortcuts Modal**: Beautiful modal showing all available shortcuts
+- **Platform Detection**: Shows Mac (⌘) or Windows (Ctrl) key indicators
+- **Footer Enhancement**: Added keyboard shortcuts link in footer
+
+### 6. Code Quality Improvements ✅
+- **New Components**:
+  - `DraggableDivider.tsx`: Reusable split-view divider component
+- **New Hooks**:
+  - `useKeyboardShortcuts.ts`: Centralized keyboard shortcut management
+  - `usePinchZoom.ts`: Touch gesture handling for mobile zoom
+- **Performance**: Optimized with useCallback and proper state management
+- **Type Safety**: Full TypeScript support throughout new features
+
+## Technical Implementation Details
+
+### DraggableDivider Component
+- Uses framer-motion for smooth dragging animations
+- Supports both mouse and touch events
+- Clamps position between 20% and 80% for usability
+- Shows visual handle with ArrowsLeftRight icon
+- Elevated design with shadow and border
+
+### Keyboard Shortcuts Hook
+- Platform-aware (detects Mac vs Windows)
+- Prevents default browser shortcuts
+- Only active when not processing
+- Easy to extend with new shortcuts
+- Clean event listener management
+
+### Pinch Zoom Hook
+- Calculates distance between two touch points
+- Converts distance delta to zoom level change
+- Proper touch event cleanup
+- Conditional enablement based on device and state
+
+### Settings History System
+- Array-based history with index pointer
+- Immutable state updates
+- Timestamp tracking for future features
+- Efficient slicing for redo branch removal
 
 ## Conclusion
 All major PRD requirements have been implemented, with particular focus on mobile responsiveness, animation polish, and user experience refinements. The application now provides a professional, delightful experience across all device sizes while maintaining performance and accessibility standards.
