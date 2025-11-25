@@ -1,6 +1,6 @@
 # VectorForge - Smart Image Converter
 
-Transform raster PNG images into scalable SVG vectors with AI-powered precision for designers and developers who demand professional-quality, infinitely scalable graphics.
+Transform images between multiple formats with AI-powered PNG to SVG conversion for designers and developers who demand professional-quality, infinitely scalable graphics and optimized web assets.
 
 ## Experience Qualities
 
@@ -48,6 +48,20 @@ Transform raster PNG images into scalable SVG vectors with AI-powered precision 
 - **Trigger**: User clicks download button or views history
 - **Progression**: Click download → File saves locally → Entry added to history → User can reconvert or redownload
 - **Success criteria**: Downloads work reliably, history persists across sessions
+
+### Multi-Format Conversion
+- **Functionality**: Convert images between PNG, JPG, WebP formats with quality control
+- **Purpose**: Provides flexible format optimization for web performance and compatibility
+- **Trigger**: User selects image and target format
+- **Progression**: Upload image → Choose format & quality → Convert → Preview & download
+- **Success criteria**: Support PNG, JPG, WebP formats with adjustable quality, show file size comparison
+
+### Format Education Guide
+- **Functionality**: Comprehensive comparison and explanation of image formats (SVG, PNG, JPG, WebP)
+- **Purpose**: Helps users understand when to use each format for optimal results
+- **Trigger**: User clicks "Format Guide" in header or formats tab
+- **Progression**: View guide → Compare formats → Understand trade-offs → Make informed decisions
+- **Success criteria**: Clear explanations, visual comparisons, best-use recommendations
 
 ## Edge Case Handling
 

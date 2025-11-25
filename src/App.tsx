@@ -11,6 +11,8 @@ import {
   Command,
   Check,
   Files,
+  BookOpen,
+  ArrowLeft,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
@@ -25,6 +27,8 @@ import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
 import { BatchConversion } from '@/components/BatchConversion'
 import { ConversionHistory } from '@/components/ConversionHistory'
 import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
+import { FormatGuide } from '@/components/FormatGuide'
+import { MultiFormatConverter } from '@/components/MultiFormatConverter'
 
 function App() {
   const isMobile = useIsMobile()
@@ -34,6 +38,7 @@ function App() {
   const [dividerPosition, setDividerPosition] = useState(50)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [isBatchMode, setIsBatchMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -213,51 +218,80 @@ function App() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="flex items-center gap-3">
-            <motion.div
-              className="p-2 bg-primary rounded-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Sparkle className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" weight="fill" />
-            </motion.div>
-            <div>
-              <h1 className="text-2xl md:text-[32px] font-bold tracking-tight leading-none">
-                VectorForge
-              </h1>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Smart PNG to SVG Converter
-              </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <motion.div
+                className="p-2 bg-primary rounded-lg cursor-pointer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setCurrentPage('converter')}
+              >
+                <Sparkle className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" weight="fill" />
+              </motion.div>
+              <div>
+                <h1 className="text-2xl md:text-[32px] font-bold tracking-tight leading-none">
+                  VectorForge
+                </h1>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Smart Image Converter
+                </p>
+              </div>
             </div>
+            
+            <Button
+              variant={currentPage === 'formats' ? 'default' : 'outline'}
+              onClick={() => setCurrentPage(currentPage === 'converter' ? 'formats' : 'converter')}
+              className="gap-2"
+            >
+              {currentPage === 'formats' ? (
+                <>
+                  <ArrowLeft className="w-4 h-4" weight="bold" />
+                  <span className="hidden sm:inline">Back</span>
+                </>
+              ) : (
+                <>
+                  <BookOpen className="w-4 h-4" weight="bold" />
+                  <span className="hidden sm:inline">Format Guide</span>
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png"
-          multiple
-          className="hidden"
-          onChange={(e) => handleSingleFileSelect(e.target.files)}
-        />
+        {currentPage === 'formats' ? (
+          <FormatGuide />
+        ) : (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png"
+              multiple
+              className="hidden"
+              onChange={(e) => handleSingleFileSelect(e.target.files)}
+            />
 
-        <Tabs defaultValue="convert" className="w-full">
-          <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-3">
-            <TabsTrigger value="convert" className="gap-2">
-              <UploadSimple weight="bold" />
-              <span className="hidden sm:inline">Convert</span>
-            </TabsTrigger>
-            <TabsTrigger value="batch" className="gap-2">
-              <Files weight="bold" />
-              <span className="hidden sm:inline">Batch</span>
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <ClockCounterClockwise weight="bold" />
-              <span className="hidden sm:inline">History ({history?.length || 0})</span>
-            </TabsTrigger>
-          </TabsList>
+            <Tabs defaultValue="convert" className="w-full">
+              <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-4">
+                <TabsTrigger value="convert" className="gap-2">
+                  <UploadSimple weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">Convert</span>
+                </TabsTrigger>
+                <TabsTrigger value="batch" className="gap-2">
+                  <Files weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">Batch</span>
+                </TabsTrigger>
+                <TabsTrigger value="formats" className="gap-2">
+                  <Sparkle weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">Formats</span>
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2">
+                  <ClockCounterClockwise weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">History</span>
+                </TabsTrigger>
+              </TabsList>
 
           <TabsContent value="convert" className="space-y-4 md:space-y-6">
             <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
@@ -322,6 +356,10 @@ function App() {
             />
           </TabsContent>
 
+          <TabsContent value="formats" className="space-y-4 md:space-y-6">
+            <MultiFormatConverter />
+          </TabsContent>
+
           <TabsContent value="history">
             <ConversionHistory
               history={history || []}
@@ -330,6 +368,8 @@ function App() {
             />
           </TabsContent>
         </Tabs>
+        </>
+        )}
       </main>
 
       {isMobile && currentJob && (
