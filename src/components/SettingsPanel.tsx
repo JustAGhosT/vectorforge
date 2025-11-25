@@ -18,6 +18,8 @@ interface SettingsPanelProps {
   historyLength: number
   onUndo: () => void
   onRedo: () => void
+  onAIOptimize?: () => void
+  isAIOptimizing?: boolean
 }
 
 export function SettingsPanel({
@@ -30,11 +32,28 @@ export function SettingsPanel({
   historyLength,
   onUndo,
   onRedo,
+  onAIOptimize,
+  isAIOptimizing = false,
 }: SettingsPanelProps) {
   const isMobile = useIsMobile()
 
   const SettingsContent = () => (
     <div className="space-y-6">
+      {onAIOptimize && canReconvert && (
+        <>
+          <Button
+            variant="default"
+            className="w-full gap-2 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+            onClick={onAIOptimize}
+            disabled={isProcessing || isAIOptimizing}
+          >
+            <Sparkle weight="fill" className="w-4 h-4" />
+            {isAIOptimizing ? 'Analyzing...' : 'AI Optimize'}
+          </Button>
+          <Separator />
+        </>
+      )}
+      
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium">Complexity</label>

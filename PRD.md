@@ -1,6 +1,6 @@
 # VectorForge - Smart Image Converter
 
-Transform images between multiple formats with AI-powered PNG to SVG conversion for designers and developers who demand professional-quality, infinitely scalable graphics and optimized web assets.
+Transform images between multiple formats with AI-powered PNG to SVG conversion and intelligent optimization suggestions for designers and developers who demand professional-quality, infinitely scalable graphics and optimized web assets.
 
 ## Experience Qualities
 
@@ -62,6 +62,13 @@ Transform images between multiple formats with AI-powered PNG to SVG conversion 
 - **Trigger**: User clicks "Format Guide" in header or formats tab
 - **Progression**: View guide → Compare formats → Understand trade-offs → Make informed decisions
 - **Success criteria**: Clear explanations, visual comparisons, best-use recommendations
+
+### AI-Powered Optimization
+- **Functionality**: Intelligent analysis of uploaded images with automatic setting recommendations
+- **Purpose**: Eliminates guesswork by providing expert-level optimization suggestions tailored to image type
+- **Trigger**: User clicks "AI Optimize" button in settings panel after uploading an image
+- **Progression**: Upload image → Click AI Optimize → Local analysis runs → AI analyzes characteristics → Suggestions displayed with reasoning → User reviews and applies or adjusts → Reconversion with optimal settings
+- **Success criteria**: Analysis completes in under 5 seconds, provides accurate image type detection (logo/icon/photo/illustration), suggests settings that improve output quality, includes clear reasoning for suggestions
 
 ## Edge Case Handling
 

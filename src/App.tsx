@@ -21,6 +21,7 @@ import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { useConversion } from '@/hooks/use-conversion'
 import { useBatchConversion } from '@/hooks/use-batch-conversion'
 import { useSettingsHistory } from '@/hooks/use-settings-history'
+import { useAIOptimizer } from '@/hooks/use-ai-optimizer'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
@@ -29,6 +30,7 @@ import { ConversionHistory } from '@/components/ConversionHistory'
 import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
 import { FormatGuide } from '@/components/FormatGuide'
 import { MultiFormatConverter } from '@/components/MultiFormatConverter'
+import { AISuggestionCard } from '@/components/AISuggestionCard'
 
 function App() {
   const isMobile = useIsMobile()
@@ -76,6 +78,15 @@ function App() {
     handleDownloadAllBatch,
     clearBatch,
   } = useBatchConversion(settings)
+
+  const {
+    suggestion,
+    analysis,
+    isAnalyzing,
+    error: aiError,
+    analyzeImage,
+    clearSuggestion,
+  } = useAIOptimizer()
 
   const isProcessing = isConversionProcessing || isBatchProcessing
 
@@ -171,6 +182,46 @@ function App() {
       setHistory((current) => [job, ...(current || [])].slice(0, 20))
     }
   }, [handleReconvert, setHistory])
+
+  const handleAIOptimize = useCallback(async () => {
+    if (!currentJob) {
+      toast.error('No image to analyze')
+      return
+    }
+
+    try {
+      clearSuggestion()
+      const aiSuggestion = await analyzeImage(currentJob.pngDataUrl, settings)
+      
+      toast.success('AI Analysis Complete', {
+        description: `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`,
+      })
+    } catch (error) {
+      toast.error('AI Analysis Failed', {
+        description: error instanceof Error ? error.message : 'Could not analyze image',
+      })
+    }
+  }, [currentJob, settings, analyzeImage, clearSuggestion])
+
+  const handleApplyAISuggestion = useCallback(
+    async (suggestedSettings: { complexity: number; colorSimplification: number; pathSmoothing: number }) => {
+      updateSettings(suggestedSettings)
+      
+      toast.info('Applying AI suggestions...', {
+        description: 'Reconverting with optimal settings',
+      })
+
+      setTimeout(async () => {
+        const job = await handleReconvert()
+        if (job) {
+          setHistory((current) => [job, ...(current || [])].slice(0, 20))
+          toast.success('AI optimization applied successfully!')
+        }
+        clearSuggestion()
+      }, 100)
+    },
+    [updateSettings, handleReconvert, setHistory, clearSuggestion]
+  )
 
   const handleSingleFileSelect = useCallback(
     async (files: FileList | null) => {
@@ -321,6 +372,15 @@ function App() {
               </div>
 
               <div className="space-y-4 md:space-y-6">
+                {suggestion && (
+                  <AISuggestionCard
+                    suggestion={suggestion}
+                    analysis={analysis}
+                    onApply={handleApplyAISuggestion}
+                    onDismiss={clearSuggestion}
+                    isApplying={isProcessing}
+                  />
+                )}
                 <SettingsPanel
                   settings={settings}
                   onSettingChange={handleSettingChange}
@@ -331,6 +391,8 @@ function App() {
                   historyLength={settingsHistory.length}
                   onUndo={undoSettings}
                   onRedo={redoSettings}
+                  onAIOptimize={handleAIOptimize}
+                  isAIOptimizing={isAnalyzing}
                 />
                 <SettingsInfoCard />
               </div>
