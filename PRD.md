@@ -1,0 +1,142 @@
+# VectorForge - Smart Image Converter
+
+Transform raster PNG images into scalable SVG vectors with AI-powered precision for designers and developers who demand professional-quality, infinitely scalable graphics.
+
+## Experience Qualities
+
+1. **Effortless** - Conversion should feel instantaneous and require zero technical knowledge
+2. **Trustworthy** - Users should feel confident in the quality and accuracy of conversions
+3. **Professional** - The interface should communicate capability and precision
+
+## Complexity Level
+
+**Light Application** (multiple features with basic state) - This MVP focuses on demonstrating the core conversion workflow with preview capabilities, settings adjustment, and file management. We're building a functional prototype that showcases the value proposition without the full enterprise infrastructure.
+
+## Essential Features
+
+### Image Upload & Processing
+- **Functionality**: Drag-and-drop PNG file upload with visual feedback
+- **Purpose**: Removes friction from the conversion initiation process
+- **Trigger**: User drops file or clicks upload area
+- **Progression**: Drop file → Visual upload feedback → Automatic processing → Preview ready
+- **Success criteria**: File uploads complete within 2 seconds, all PNG formats supported up to 10MB
+
+### Real-Time Conversion Preview
+- **Functionality**: Side-by-side comparison of original PNG and generated SVG
+- **Purpose**: Builds trust by allowing quality verification before download
+- **Trigger**: Conversion completes
+- **Progression**: Processing complete → Split view appears → User can zoom/pan both versions → Quality confidence achieved
+- **Success criteria**: Preview renders within 1 second of processing, zoom works smoothly
+
+### Quality Adjustment Controls
+- **Functionality**: Sliders for complexity, color simplification, and path smoothing
+- **Purpose**: Empowers users to optimize output for their specific use case
+- **Trigger**: User adjusts settings in control panel
+- **Progression**: Adjust slider → Live preview updates → Visual feedback on changes → Download optimized result
+- **Success criteria**: Settings changes apply within 500ms, visible quality differences
+
+### Smart Download & History
+- **Functionality**: One-click download with automatic file naming, persistent conversion history
+- **Purpose**: Streamlines workflow and enables quick access to previous conversions
+- **Trigger**: User clicks download button or views history
+- **Progression**: Click download → File saves locally → Entry added to history → User can reconvert or redownload
+- **Success criteria**: Downloads work reliably, history persists across sessions
+
+## Edge Case Handling
+
+- **Invalid File Types** - Clear error message with supported format guidance
+- **Oversized Files** - Friendly size limit warning with compression suggestions
+- **Complex Images** - Automatic quality adjustment with user notification
+- **No File Selected** - Helpful placeholder state encouraging first upload
+- **Processing Failures** - Graceful error with retry option
+
+## Design Direction
+
+The design should feel cutting-edge yet approachable—like a professional tool that's been refined to its essence. Clean, modern minimalism with purposeful moments of visual polish. The interface should recede when showing results but provide confident guidance during setup. Think Apple-level finish with Google-level accessibility.
+
+## Color Selection
+
+**Triadic** - Using a technology-forward palette that communicates precision and innovation. The three core colors (purple, cyan, orange) create visual interest while maintaining professional credibility.
+
+- **Primary Color**: Deep Purple `oklch(0.45 0.18 285)` - Communicates creativity and innovation without feeling playful
+- **Secondary Colors**: 
+  - Vibrant Cyan `oklch(0.7 0.15 195)` - Represents digital precision and technical capability
+  - Energetic Orange `oklch(0.7 0.16 45)` - Provides warmth and highlights actions
+- **Accent Color**: Bright Orange `oklch(0.75 0.18 45)` - CTAs and important interactive elements demand attention
+- **Foreground/Background Pairings**:
+  - Background (Soft White `oklch(0.98 0 0)`): Dark Charcoal text `oklch(0.25 0 0)` - Ratio 13.2:1 ✓
+  - Card (Pure White `oklch(1 0 0)`): Dark Charcoal text `oklch(0.25 0 0)` - Ratio 14.8:1 ✓
+  - Primary (Deep Purple): White text `oklch(1 0 0)` - Ratio 5.2:1 ✓
+  - Secondary (Light Gray `oklch(0.96 0 0)`): Medium Gray text `oklch(0.35 0 0)` - Ratio 10.1:1 ✓
+  - Accent (Bright Orange): White text `oklch(1 0 0)` - Ratio 4.9:1 ✓
+  - Muted (Subtle Gray `oklch(0.94 0 0)`): Dark Gray text `oklch(0.45 0 0)` - Ratio 7.8:1 ✓
+
+## Font Selection
+
+Typography should communicate technical precision while remaining highly legible. A clean sans-serif that feels modern without being trendy, with careful attention to number rendering for technical details.
+
+- **Typographic Hierarchy**:
+  - H1 (App Title): Inter Bold/32px/tight letter-spacing (-0.02em)
+  - H2 (Section Headers): Inter SemiBold/24px/normal letter-spacing
+  - H3 (Card Titles): Inter Medium/18px/normal letter-spacing
+  - Body (Interface Text): Inter Regular/14px/relaxed line-height (1.6)
+  - Caption (Metadata): Inter Regular/12px/medium gray color
+  - Button Labels: Inter Medium/14px/slight letter-spacing (0.01em)
+
+## Animations
+
+Animations should feel responsive and purposeful—reinforcing the sense that this is a powerful tool working intelligently. Quick, physics-based transitions that guide attention without demanding it.
+
+- **Purposeful Meaning**: Processing animations communicate active work happening, while completion states celebrate success
+- **Hierarchy of Movement**: File uploads get immediate feedback (100ms), processing shows continuous progress, preview transitions are quick but smooth (250ms)
+
+## Component Selection
+
+- **Components**:
+  - `Card` - Main conversion workspace with subtle shadow for depth
+  - `Button` (Primary variant) - Download and conversion actions with hover lift
+  - `Slider` - Quality adjustment controls with custom styling
+  - `Tabs` - Switch between upload/history views with smooth underline transition
+  - `Progress` - Processing indication with percentage display
+  - `Dialog` - Settings panel with backdrop blur
+  - `Badge` - File size and format indicators
+  - `Separator` - Visual grouping in controls panel
+  - `ScrollArea` - History list with smooth scrolling
+
+- **Customizations**:
+  - Split-view comparison component with draggable divider
+  - Drop zone with animated border and icon states
+  - Custom file preview cards with hover states
+  - Processing status indicator with pulsing animation
+
+- **States**:
+  - Buttons: Rest → Hover (lift + brighten) → Active (scale down) → Disabled (reduced opacity)
+  - Upload zone: Empty → Hover (border glow) → Dragging (background tint) → Processing (pulsing border)
+  - Sliders: Smooth thumb movement with value tooltip on hover
+  - History items: Subtle hover lift with shadow increase
+
+- **Icon Selection**:
+  - `UploadSimple` - Upload zone
+  - `FileImage` - File type indicators
+  - `Sparkle` - AI/quality features
+  - `DownloadSimple` - Download actions
+  - `SlidersHorizontal` - Settings/adjustments
+  - `ClockCounterClockwise` - History
+  - `ArrowsOutSimple` - Zoom/expand
+  - `Check` - Success states
+  - `Warning` - Error states
+
+- **Spacing**:
+  - Container padding: `p-6` (24px)
+  - Card spacing: `gap-4` (16px) for grouped elements
+  - Section margins: `mb-8` (32px) between major sections
+  - Inline elements: `gap-2` (8px) for related items
+  - Button padding: `px-6 py-3` for primary actions
+
+- **Mobile**:
+  - Stack split-view vertically on mobile
+  - Expand touch targets to minimum 44px
+  - Collapse settings into bottom sheet
+  - Single-column layout for history
+  - Sticky download button at bottom
+  - Reduce padding to `p-4` on small screens
