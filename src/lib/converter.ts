@@ -13,6 +13,18 @@ export interface ConversionJob {
   settings: ConversionSettings
   pngDataUrl: string
   svgDataUrl: string
+  status?: 'pending' | 'processing' | 'completed' | 'failed'
+  error?: string
+}
+
+export interface BatchConversionJob {
+  id: string
+  timestamp: number
+  totalFiles: number
+  completedFiles: number
+  failedFiles: number
+  jobs: ConversionJob[]
+  status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
 export async function convertPngToSvg(
@@ -311,4 +323,72 @@ export function formatFileSize(bytes: number): string {
 
 export function generateJobId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+}
+
+export async function convertMultiplePngs(
+  files: File[],
+  settings: ConversionSettings,
+  onProgress?: (completed: number, total: number) => void
+): Promise<ConversionJob[]> {
+  const jobs: ConversionJob[] = []
+  let completed = 0
+
+  for (const file of files) {
+    try {
+      const reader = new FileReader()
+      const pngDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(file)
+      })
+
+      const { svgDataUrl, svgSize } = await convertPngToSvg(file, settings)
+
+      const job: ConversionJob = {
+        id: generateJobId(),
+        filename: file.name,
+        timestamp: Date.now(),
+        originalSize: file.size,
+        svgSize,
+        settings: { ...settings },
+        pngDataUrl,
+        svgDataUrl,
+        status: 'completed',
+      }
+
+      jobs.push(job)
+      completed++
+      onProgress?.(completed, files.length)
+    } catch (error) {
+      const job: ConversionJob = {
+        id: generateJobId(),
+        filename: file.name,
+        timestamp: Date.now(),
+        originalSize: file.size,
+        svgSize: 0,
+        settings: { ...settings },
+        pngDataUrl: '',
+        svgDataUrl: '',
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Conversion failed',
+      }
+
+      jobs.push(job)
+      completed++
+      onProgress?.(completed, files.length)
+    }
+  }
+
+  return jobs
+}
+
+export function downloadAllAsZip(jobs: ConversionJob[]): void {
+  jobs.forEach((job) => {
+    if (job.status === 'completed' && job.svgDataUrl) {
+      const a = document.createElement('a')
+      a.href = job.svgDataUrl
+      a.download = job.filename.replace(/\.png$/i, '.svg')
+      a.click()
+    }
+  })
 }

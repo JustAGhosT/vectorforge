@@ -23,15 +23,21 @@ import {
   ArrowsLeftRight,
   ArrowCounterClockwise,
   Command,
+  Files,
+  X,
+  Trash,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   convertPngToSvg,
+  convertMultiplePngs,
+  downloadAllAsZip,
   formatFileSize,
   generateJobId,
   type ConversionJob,
   type ConversionSettings,
+  type BatchConversionJob,
 } from '@/lib/converter'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -63,8 +69,13 @@ function App() {
   const [settingsHistoryIndex, setSettingsHistoryIndex] = useState(-1)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [hasPinchedBefore, setHasPinchedBefore] = useState(false)
+  const [batchFiles, setBatchFiles] = useState<File[]>([])
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({ completed: 0, total: 0 })
+  const [batchJobs, setBatchJobs] = useState<ConversionJob[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const batchFileInputRef = useRef<HTMLInputElement>(null)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
 
@@ -185,9 +196,20 @@ function App() {
       e.preventDefault()
       setIsDragging(false)
 
-      const file = e.dataTransfer.files[0]
-      if (file) {
-        handleFileSelect(file)
+      const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/png'))
+      
+      if (files.length === 0) {
+        toast.error('No PNG files found', {
+          description: 'Please drop PNG image files',
+        })
+        return
+      }
+
+      if (files.length === 1) {
+        handleFileSelect(files[0])
+      } else {
+        setBatchFiles(files)
+        setIsBatchMode(true)
       }
     },
     [handleFileSelect]
@@ -249,9 +271,101 @@ function App() {
     setCurrentJob(job)
     setSettings(job.settings)
     setZoomLevel(1)
+    setIsBatchMode(false)
+    setBatchFiles([])
+    setBatchJobs([])
     toast.info('Loaded from history', {
       description: job.filename,
     })
+  }, [])
+
+  const handleBatchFilesSelect = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    const pngFiles = Array.from(files).filter(file => file.type.startsWith('image/png'))
+    
+    if (pngFiles.length === 0) {
+      toast.error('No PNG files found', {
+        description: 'Please select PNG image files',
+      })
+      return
+    }
+
+    if (pngFiles.length > 50) {
+      toast.error('Too many files', {
+        description: 'Please select up to 50 files at a time',
+      })
+      return
+    }
+
+    setBatchFiles(pngFiles)
+    setIsBatchMode(true)
+    setCurrentJob(null)
+    toast.info(`${pngFiles.length} files selected`, {
+      description: 'Ready to convert',
+    })
+  }, [])
+
+  const removeBatchFile = useCallback((index: number) => {
+    setBatchFiles(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const handleBatchConvert = useCallback(async () => {
+    if (batchFiles.length === 0) return
+
+    setIsProcessing(true)
+    setBatchProgress({ completed: 0, total: batchFiles.length })
+    setBatchJobs([])
+
+    try {
+      const jobs = await convertMultiplePngs(
+        batchFiles,
+        settings,
+        (completed, total) => {
+          setBatchProgress({ completed, total })
+        }
+      )
+
+      setBatchJobs(jobs)
+      setHistory((current) => [...jobs.filter(j => j.status === 'completed'), ...(current || [])].slice(0, 100))
+
+      const successCount = jobs.filter(j => j.status === 'completed').length
+      const failCount = jobs.filter(j => j.status === 'failed').length
+
+      if (failCount === 0) {
+        toast.success('Batch conversion complete!', {
+          description: `${successCount} files converted successfully`,
+        })
+      } else {
+        toast.warning('Batch conversion finished', {
+          description: `${successCount} succeeded, ${failCount} failed`,
+        })
+      }
+    } catch (error) {
+      toast.error('Batch conversion failed', {
+        description: error instanceof Error ? error.message : 'An error occurred',
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [batchFiles, settings, setHistory])
+
+  const handleDownloadAllBatch = useCallback(() => {
+    if (batchJobs.length === 0) return
+    
+    const successJobs = batchJobs.filter(j => j.status === 'completed')
+    downloadAllAsZip(successJobs)
+    
+    toast.success('Downloading all files', {
+      description: `${successJobs.length} SVG files`,
+    })
+  }, [batchJobs])
+
+  const clearBatch = useCallback(() => {
+    setBatchFiles([])
+    setBatchJobs([])
+    setIsBatchMode(false)
+    setBatchProgress({ completed: 0, total: 0 })
   }, [])
 
   useKeyboardShortcuts(
@@ -305,14 +419,18 @@ function App() {
 
       <main className="container mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
         <Tabs defaultValue="convert" className="w-full">
-          <TabsList className="mb-4 md:mb-6 w-full md:w-auto">
-            <TabsTrigger value="convert" className="gap-2 flex-1 md:flex-initial">
+          <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-3">
+            <TabsTrigger value="convert" className="gap-2">
               <UploadSimple weight="bold" />
-              Convert
+              <span className="hidden sm:inline">Convert</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 flex-1 md:flex-initial">
+            <TabsTrigger value="batch" className="gap-2">
+              <Files weight="bold" />
+              <span className="hidden sm:inline">Batch</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
               <ClockCounterClockwise weight="bold" />
-              History ({history?.length || 0})
+              <span className="hidden sm:inline">History ({history?.length || 0})</span>
             </TabsTrigger>
           </TabsList>
 
@@ -340,8 +458,14 @@ function App() {
                       accept="image/png"
                       className="hidden"
                       onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleFileSelect(file)
+                        const files = e.target.files
+                        if (files && files.length > 0) {
+                          if (files.length === 1) {
+                            handleFileSelect(files[0])
+                          } else {
+                            handleBatchFilesSelect(files)
+                          }
+                        }
                       }}
                     />
 
@@ -809,6 +933,212 @@ function App() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="batch" className="space-y-4 md:space-y-6">
+            <Card className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base md:text-lg font-semibold">Batch Conversion</h3>
+                {batchFiles.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearBatch}
+                    className="gap-2"
+                  >
+                    <Trash weight="bold" />
+                    Clear All
+                  </Button>
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  'border-2 border-dashed rounded-lg p-8 md:p-12 text-center transition-all duration-300 cursor-pointer mb-4',
+                  isDragging
+                    ? 'border-primary bg-primary/5 scale-[1.02]'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/30',
+                  isProcessing && 'pointer-events-none opacity-60'
+                )}
+                onClick={() => batchFileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+              >
+                <input
+                  ref={batchFileInputRef}
+                  type="file"
+                  accept="image/png"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleBatchFilesSelect(e.target.files)}
+                />
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="inline-flex p-3 md:p-4 rounded-full bg-primary/10 mb-3 md:mb-4">
+                    <Files className="w-6 h-6 md:w-8 md:h-8 text-primary" weight="bold" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">
+                    Select multiple PNG files
+                  </h3>
+                  <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
+                    Upload up to 50 files at once (10MB each max)
+                  </p>
+                  <Button variant="outline" size="sm" className="min-h-[44px] md:min-h-0">
+                    Select Files
+                  </Button>
+                </motion.div>
+              </div>
+
+              {batchFiles.length > 0 && !isProcessing && batchJobs.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {batchFiles.length} file{batchFiles.length > 1 ? 's' : ''} ready
+                    </p>
+                    <Button
+                      onClick={handleBatchConvert}
+                      className="gap-2 min-h-[44px] md:min-h-0"
+                    >
+                      <Sparkle weight="fill" />
+                      Convert All
+                    </Button>
+                  </div>
+
+                  <ScrollArea className="h-[300px] rounded-lg border border-border">
+                    <div className="p-4 space-y-2">
+                      {batchFiles.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <FileImage className="w-5 h-5 text-muted-foreground flex-shrink-0" weight="bold" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeBatchFile(index)}
+                            className="flex-shrink-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </motion.div>
+              )}
+
+              {isProcessing && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-4"
+                >
+                  <div className="text-center py-8">
+                    <div className="inline-flex p-4 rounded-full bg-primary/10 mb-4 animate-pulse">
+                      <Sparkle className="w-8 h-8 text-primary" weight="fill" />
+                    </div>
+                    <p className="text-sm font-medium mb-2">
+                      Converting files...
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      {batchProgress.completed} of {batchProgress.total} complete
+                    </p>
+                    <Progress 
+                      value={(batchProgress.completed / batchProgress.total) * 100} 
+                      className="h-2 max-w-md mx-auto"
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {batchJobs.length > 0 && !isProcessing && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <div className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-primary" weight="bold" />
+                      <div>
+                        <p className="font-medium text-sm">Conversion Complete</p>
+                        <p className="text-xs text-muted-foreground">
+                          {batchJobs.filter(j => j.status === 'completed').length} succeeded
+                          {batchJobs.filter(j => j.status === 'failed').length > 0 && 
+                            `, ${batchJobs.filter(j => j.status === 'failed').length} failed`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleDownloadAllBatch}
+                      className="gap-2 min-h-[44px] md:min-h-0"
+                    >
+                      <DownloadSimple weight="bold" />
+                      Download All
+                    </Button>
+                  </div>
+
+                  <ScrollArea className="h-[400px] rounded-lg border border-border">
+                    <div className="p-4 space-y-2">
+                      {batchJobs.map((job, index) => (
+                        <div
+                          key={job.id}
+                          className={cn(
+                            'flex items-center justify-between p-3 rounded-lg transition-colors',
+                            job.status === 'completed' 
+                              ? 'bg-muted/30 hover:bg-muted/50' 
+                              : 'bg-destructive/10'
+                          )}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {job.status === 'completed' ? (
+                              <Check className="w-5 h-5 text-primary flex-shrink-0" weight="bold" />
+                            ) : (
+                              <Warning className="w-5 h-5 text-destructive flex-shrink-0" weight="bold" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{job.filename}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {job.status === 'completed' 
+                                  ? `${formatFileSize(job.originalSize)} → ${formatFileSize(job.svgSize)}`
+                                  : job.error || 'Failed to convert'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          {job.status === 'completed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownload(job)}
+                              className="flex-shrink-0 gap-2 min-h-[44px] md:min-h-0"
+                            >
+                              <DownloadSimple weight="bold" className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </motion.div>
+              )}
+            </Card>
           </TabsContent>
 
           <TabsContent value="history">
