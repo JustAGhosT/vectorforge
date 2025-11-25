@@ -1,7 +1,7 @@
 export interface ConversionSettings {
-  complexity: number
-  colorSimplification: number
-  pathSmoothing: number
+  colorSimplificatio
+}
+export interface Conver
 }
 
 export interface ConversionJob {
@@ -14,53 +14,53 @@ export interface ConversionJob {
   pngDataUrl: string
   svgDataUrl: string
   status?: 'pending' | 'processing' | 'completed' | 'failed'
-  error?: string
-}
-
-export interface BatchConversionJob {
   id: string
-  timestamp: number
-  totalFiles: number
-  completedFiles: number
-  failedFiles: number
-  jobs: ConversionJob[]
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-}
+ 
 
-export async function convertImageToSvg(
+  status: 'pending' | 'processing' | 
+
   file: File,
-  settings: ConversionSettings
-): Promise<{ svgDataUrl: string; svgSize: number }> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('Conversion timed out after 30 seconds'))
+): Promise<{ svgData
+    const timeoutId = se
     }, 30000)
-
-    const reader = new FileReader()
-
+    const reader = new 
     reader.onload = (e) => {
-      try {
-        if (!e.target?.result) {
-          clearTimeout(timeoutId)
-          reject(new Error('Failed to read file data'))
-          return
+ 
+
         }
-
-        const img = new Image()
-        
+        const
         img.onload = () => {
-          try {
             if (!img.width || !img.height) {
-              clearTimeout(timeoutId)
-              reject(new Error('Invalid image dimensions'))
-              return
+              reject(new Error('Invalid ima
             }
-
             if (img.width > 10000 || img.height > 10000) {
-              clearTimeout(timeoutId)
-              reject(new Error('Image too large (max 10000x10000 pixels)'))
+             
+
+            const canvas = document
+
+              clearTimeout(t
+           
+
+            canvas.height = img.h
+            ctx.drawImage(img, 0, 0)
+            cons
+         
+
               return
-            }
+        
+            const svgDataUrl
+            cle
+              svgDataUrl,
+            })
+            clearTimeout(timeoutId)
+          }
+
+
+        }
+        img.src = e.target.result as 
+        clearTimeout(timeoutId)
+      }
+
 
             const canvas = document.createElement('canvas')
             const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -129,55 +129,38 @@ function generateSvgFromImageData(
   imageData: ImageData,
   settings: ConversionSettings
 ): string {
-  try {
-    const { width, height, data } = imageData
+  const { width, height, data } = imageData
+  const { complexity, colorSimplification, pathSmoothing } = settings
+
+  const colorCount = Math.max(4, Math.floor(256 - (colorSimplification * 240)))
+  const detailThreshold = Math.max(2, Math.floor(50 - (complexity * 45)))
+  const smoothness = pathSmoothing
+
+  const quantizedData = quantizeColors(data, colorCount)
+  const colorLayers = extractColorLayers(quantizedData, width, height)
+  const paths: string[] = []
+
+  colorLayers.forEach(({ color, pixels }) => {
+    const contours = traceContours(pixels, width, height, detailThreshold)
     
-    if (!width || !height || !data || data.length === 0) {
-      throw new Error('Invalid image data')
-    }
-
-    const { complexity, colorSimplification, pathSmoothing } = settings
-
-    const colorCount = Math.max(4, Math.floor(256 - (colorSimplification * 240)))
-    const detailThreshold = Math.max(2, Math.floor(50 - (complexity * 45)))
-    const smoothness = pathSmoothing
-
-    const quantizedData = quantizeColors(data, colorCount)
-    const colorLayers = extractColorLayers(quantizedData, width, height)
-    const paths: string[] = []
-
-    colorLayers.forEach(({ color, pixels }) => {
-      try {
-        const contours = traceContours(pixels, width, height, detailThreshold)
-        
-        contours.forEach(contour => {
-          if (contour.length < 3) return
-          
-          const smoothedContour = smoothness > 0.3 
-            ? applyCatmullRomSpline(contour, smoothness)
-            : contour
-          
-          const pathData = contourToPath(smoothedContour, smoothness)
-          if (pathData) {
-            paths.push(`<path d="${pathData}" fill="${color}" />`)
-          }
-        })
-      } catch (error) {
-        console.warn('Failed to process color layer:', color, error)
+    contours.forEach(contour => {
+      if (contour.length < 3) return
+      
+      const smoothedContour = smoothness > 0.3 
+        ? applyCatmullRomSpline(contour, smoothness)
+        : contour
+      
+      const pathData = contourToPath(smoothedContour, smoothness)
+      if (pathData) {
+        paths.push(`<path d="${pathData}" fill="${color}" />`)
       }
     })
+  })
 
-    if (paths.length === 0) {
-      throw new Error('No valid paths generated. Image may be too simple or settings too restrictive.')
-    }
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
   ${paths.join('\n  ')}
 </svg>`
-  } catch (error) {
-    throw new Error(`SVG generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
 }
 
 function quantizeColors(data: Uint8ClampedArray, levels: number): Uint8ClampedArray {
@@ -527,8 +510,8 @@ export function downloadAllAsZip(jobs: ConversionJob[]): void {
     if (job.status === 'completed' && job.svgDataUrl) {
       const a = document.createElement('a')
       a.href = job.svgDataUrl
-      a.download = job.filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.svg')
-      a.click()
-    }
-  })
-}
+
+
+
+
+
