@@ -61,6 +61,7 @@ export function useConversion(settings: ConversionSettings) {
           settings: { ...settings },
           pngDataUrl,
           svgDataUrl,
+          status: 'completed',
         }
 
         setCurrentJob(job)
@@ -71,10 +72,32 @@ export function useConversion(settings: ConversionSettings) {
 
         return job
       } catch (error) {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current)
+        }
+        
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+        
+        const failedJob: ConversionJob = {
+          id: generateJobId(),
+          filename: file.name,
+          timestamp: Date.now(),
+          originalSize: file.size,
+          svgSize: 0,
+          settings: { ...settings },
+          pngDataUrl: '',
+          svgDataUrl: '',
+          status: 'failed',
+          error: errorMessage,
+        }
+        
+        setCurrentJob(failedJob)
+        
         toast.error('Conversion failed', {
-          description: error instanceof Error ? error.message : 'An error occurred',
+          description: errorMessage,
         })
-        return null
+        
+        return failedJob
       } finally {
         setIsProcessing(false)
       }

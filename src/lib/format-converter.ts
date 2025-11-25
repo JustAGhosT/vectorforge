@@ -20,68 +20,110 @@ export async function convertImageFormat(
   } = options
 
   return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Image conversion timed out'))
+    }, 15000)
+
     const reader = new FileReader()
 
     reader.onload = (e) => {
-      const img = new Image()
-      
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-        
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'))
+      try {
+        if (!e.target?.result) {
+          clearTimeout(timeoutId)
+          reject(new Error('Failed to read file'))
           return
         }
 
-        let targetWidth = width || img.width
-        let targetHeight = height || img.height
-
-        if (width && height && maintainAspectRatio) {
-          const aspectRatio = img.width / img.height
-          if (width / height > aspectRatio) {
-            targetWidth = height * aspectRatio
-          } else {
-            targetHeight = width / aspectRatio
-          }
-        } else if (width && !height) {
-          const aspectRatio = img.width / img.height
-          targetHeight = width / aspectRatio
-        } else if (height && !width) {
-          const aspectRatio = img.width / img.height
-          targetWidth = height * aspectRatio
-        }
-
-        canvas.width = targetWidth
-        canvas.height = targetHeight
-
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
-
-        const mimeType = getMimeType(targetFormat)
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to create blob'))
+        const img = new Image()
+        
+        img.onload = () => {
+          try {
+            if (!img.width || !img.height) {
+              clearTimeout(timeoutId)
+              reject(new Error('Invalid image dimensions'))
               return
             }
 
-            const dataUrl = URL.createObjectURL(blob)
-            resolve({
-              dataUrl,
-              size: blob.size,
-            })
-          },
-          mimeType,
-          quality
-        )
-      }
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+            
+            if (!ctx) {
+              clearTimeout(timeoutId)
+              reject(new Error('Failed to get canvas context for conversion'))
+              return
+            }
 
-      img.onerror = () => reject(new Error('Failed to load image'))
-      img.src = e.target?.result as string
+            let targetWidth = width || img.width
+            let targetHeight = height || img.height
+
+            if (width && height && maintainAspectRatio) {
+              const aspectRatio = img.width / img.height
+              if (width / height > aspectRatio) {
+                targetWidth = height * aspectRatio
+              } else {
+                targetHeight = width / aspectRatio
+              }
+            } else if (width && !height) {
+              const aspectRatio = img.width / img.height
+              targetHeight = width / aspectRatio
+            } else if (height && !width) {
+              const aspectRatio = img.width / img.height
+              targetWidth = height * aspectRatio
+            }
+
+            canvas.width = targetWidth
+            canvas.height = targetHeight
+
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
+
+            const mimeType = getMimeType(targetFormat)
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  clearTimeout(timeoutId)
+                  reject(new Error('Failed to create output image'))
+                  return
+                }
+
+                const dataUrl = URL.createObjectURL(blob)
+                clearTimeout(timeoutId)
+                resolve({
+                  dataUrl,
+                  size: blob.size,
+                })
+              },
+              mimeType,
+              quality
+            )
+          } catch (error) {
+            clearTimeout(timeoutId)
+            reject(new Error(`Image processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`))
+          }
+        }
+
+        img.onerror = () => {
+          clearTimeout(timeoutId)
+          reject(new Error('Failed to load image. File may be corrupted.'))
+        }
+        
+        img.src = e.target.result as string
+      } catch (error) {
+        clearTimeout(timeoutId)
+        reject(new Error(`File processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`))
+      }
     }
 
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(sourceFile)
+    reader.onerror = () => {
+      clearTimeout(timeoutId)
+      reject(new Error('Failed to read file. Please check file permissions.'))
+    }
+    
+    try {
+      reader.readAsDataURL(sourceFile)
+    } catch (error) {
+      clearTimeout(timeoutId)
+      reject(new Error(`Failed to start file reading: ${error instanceof Error ? error.message : 'Unknown error'}`))
+    }
   })
 }
 

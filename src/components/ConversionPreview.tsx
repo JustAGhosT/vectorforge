@@ -12,6 +12,7 @@ import { ConversionJob, formatFileSize } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { usePinchZoom } from '@/hooks/use-pinch-zoom'
 import { DraggableDivider } from '@/components/DraggableDivider'
+import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { toast } from 'sonner'
 
 interface ConversionPreviewProps {
@@ -25,6 +26,7 @@ interface ConversionPreviewProps {
   onDownload: (job: ConversionJob) => void
   onNewImage: () => void
   onZoomChange?: (zoom: number) => void
+  onRetry?: () => void
 }
 
 export function ConversionPreview({
@@ -38,6 +40,7 @@ export function ConversionPreview({
   onDownload,
   onNewImage,
   onZoomChange,
+  onRetry,
 }: ConversionPreviewProps) {
   const isMobile = useIsMobile()
   const previewRef = useRef<HTMLDivElement>(null)
@@ -54,6 +57,23 @@ export function ConversionPreview({
   })
 
   if (!job) return null
+
+  if (job.status === 'failed') {
+    return (
+      <ErrorDisplay
+        error={job.error || 'An unknown error occurred during conversion'}
+        title="Conversion Failed"
+        onRetry={onRetry}
+        onDismiss={onNewImage}
+        suggestions={[
+          'Ensure the image file is not corrupted',
+          'Try a smaller image size',
+          'Check if the file format is supported (PNG, JPG, WebP)',
+          'Adjust conversion settings to less complex values',
+        ]}
+      />
+    )
+  }
 
   return (
     <AnimatePresence mode="wait">

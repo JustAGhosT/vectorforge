@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
+import { setupConnectionMonitoring } from '@/lib/connection'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { useConversion } from '@/hooks/use-conversion'
@@ -31,6 +32,7 @@ import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
 import { FormatGuide } from '@/components/FormatGuide'
 import { MultiFormatConverter } from '@/components/MultiFormatConverter'
 import { AISuggestionCard } from '@/components/AISuggestionCard'
+import { ConnectionStatus } from '@/components/ConnectionStatus'
 
 function App() {
   const isMobile = useIsMobile()
@@ -41,6 +43,7 @@ function App() {
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [isBatchMode, setIsBatchMode] = useState(false)
   const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -265,8 +268,27 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  useEffect(() => {
+    const cleanup = setupConnectionMonitoring((online) => {
+      setIsOnline(online)
+      if (!online) {
+        toast.error('Connection lost', {
+          description: 'Check your internet connection',
+        })
+      } else {
+        toast.success('Connection restored', {
+          description: 'You are back online',
+        })
+      }
+    })
+
+    return cleanup
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionStatus isOnline={isOnline} />
+      
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex items-center justify-between gap-4">
@@ -368,6 +390,7 @@ function App() {
                   onDownload={handleDownload}
                   onNewImage={() => fileInputRef.current?.click()}
                   onZoomChange={setZoomLevel}
+                  onRetry={handleReconvertAndSave}
                 />
               </div>
 

@@ -79,8 +79,21 @@ Return a JSON object with:
 }`
 
   try {
+    if (!window.spark || !window.spark.llm) {
+      throw new Error('AI service not available')
+    }
+
     const response = await window.spark.llm(promptText, 'gpt-4o', true)
+    
+    if (!response) {
+      throw new Error('No response from AI service')
+    }
+
     const parsed = JSON.parse(response)
+    
+    if (!parsed.suggestedComplexity || !parsed.imageType) {
+      throw new Error('Invalid AI response format')
+    }
     
     return {
       suggestedComplexity: clamp(parsed.suggestedComplexity, 0, 1),
@@ -94,7 +107,18 @@ Return a JSON object with:
     }
   } catch (error) {
     console.error('AI optimization failed:', error)
-    throw new Error('Failed to analyze image with AI')
+    
+    if (error instanceof Error) {
+      if (error.message.includes('network') || error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to AI service. Check your internet connection.')
+      }
+      if (error.message.includes('timeout')) {
+        throw new Error('AI analysis timed out. Please try again.')
+      }
+      throw new Error(`AI analysis failed: ${error.message}`)
+    }
+    
+    throw new Error('Failed to analyze image with AI. Please try again.')
   }
 }
 
@@ -102,32 +126,53 @@ export async function analyzeImageLocally(
   imageDataUrl: string
 ): Promise<ImageAnalysis> {
   return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Image analysis timed out'))
+    }, 10000)
+
     const img = new Image()
     
     img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'))
-        return
+      try {
+        if (!img.width || !img.height) {
+          clearTimeout(timeoutId)
+          reject(new Error('Invalid image dimensions'))
+          return
+        }
+
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        
+        if (!ctx) {
+          clearTimeout(timeoutId)
+          reject(new Error('Failed to initialize canvas for analysis'))
+          return
+        }
+
+        canvas.width = img.width
+        canvas.height = img.height
+        ctx.drawImage(img, 0, 0)
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const analysis = performLocalAnalysis(imageData)
+        
+        clearTimeout(timeoutId)
+        resolve({
+          ...analysis,
+          dimensions: { width: img.width, height: img.height },
+          aspectRatio: img.width / img.height,
+        })
+      } catch (error) {
+        clearTimeout(timeoutId)
+        reject(new Error(`Local analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`))
       }
-
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.drawImage(img, 0, 0)
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const analysis = performLocalAnalysis(imageData)
-      
-      resolve({
-        ...analysis,
-        dimensions: { width: img.width, height: img.height },
-        aspectRatio: img.width / img.height,
-      })
     }
 
-    img.onerror = () => reject(new Error('Failed to load image for analysis'))
+    img.onerror = () => {
+      clearTimeout(timeoutId)
+      reject(new Error('Failed to load image for analysis'))
+    }
+    
     img.src = imageDataUrl
   })
 }
