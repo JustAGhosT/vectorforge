@@ -76,24 +76,27 @@ function generateSvgFromImageData(
   const { width, height, data } = imageData
   const { complexity, colorSimplification, pathSmoothing } = settings
 
-  const threshold = 128
-  const simplificationFactor = Math.floor(10 - (colorSimplification * 9))
-  const smoothingFactor = pathSmoothing
-  const detailLevel = Math.max(1, Math.floor(complexity * 10))
+  const colorCount = Math.max(4, Math.floor(256 - (colorSimplification * 240)))
+  const detailThreshold = Math.max(2, Math.floor(50 - (complexity * 45)))
+  const smoothness = pathSmoothing
 
-  const colors = extractColors(data, width, height, simplificationFactor)
+  const quantizedData = quantizeColors(data, colorCount)
+  const colorLayers = extractColorLayers(quantizedData, width, height)
   const paths: string[] = []
 
-  colors.forEach(color => {
-    const mask = createColorMask(data, width, height, color, threshold)
-    const regions = findRegions(mask, width, height, detailLevel)
+  colorLayers.forEach(({ color, pixels }) => {
+    const contours = traceContours(pixels, width, height, detailThreshold)
     
-    regions.forEach(region => {
-      const path = regionToPath(region, smoothingFactor)
-      if (path) {
-        paths.push(
-          `<path d="${path}" fill="${color}" fill-opacity="${region.opacity}" />`
-        )
+    contours.forEach(contour => {
+      if (contour.length < 3) return
+      
+      const smoothedContour = smoothness > 0.3 
+        ? applyCatmullRomSpline(contour, smoothness)
+        : contour
+      
+      const pathData = contourToPath(smoothedContour, smoothness)
+      if (pathData) {
+        paths.push(`<path d="${pathData}" fill="${color}" />`)
       }
     })
   })
@@ -104,213 +107,277 @@ function generateSvgFromImageData(
 </svg>`
 }
 
-function extractColors(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  maxColors: number
-): string[] {
-  const colorMap = new Map<string, number>()
+function quantizeColors(data: Uint8ClampedArray, levels: number): Uint8ClampedArray {
+  const quantized = new Uint8ClampedArray(data.length)
+  const step = Math.max(1, Math.floor(256 / levels))
 
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i]
-    const g = data[i + 1]
-    const b = data[i + 2]
     const a = data[i + 3]
-
-    if (a < 10) continue
-
-    const quantizedR = Math.floor(r / 32) * 32
-    const quantizedG = Math.floor(g / 32) * 32
-    const quantizedB = Math.floor(b / 32) * 32
-
-    const color = `rgb(${quantizedR},${quantizedG},${quantizedB})`
-    colorMap.set(color, (colorMap.get(color) || 0) + 1)
-  }
-
-  return Array.from(colorMap.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, maxColors)
-    .map(([color]) => color)
-}
-
-function createColorMask(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  targetColor: string,
-  threshold: number
-): boolean[] {
-  const [r, g, b] = targetColor.match(/\d+/g)!.map(Number)
-  const mask: boolean[] = []
-
-  for (let i = 0; i < data.length; i += 4) {
-    const pixelR = data[i]
-    const pixelG = data[i + 1]
-    const pixelB = data[i + 2]
-    const pixelA = data[i + 3]
-
-    if (pixelA < 10) {
-      mask.push(false)
+    
+    if (a < 10) {
+      quantized[i] = quantized[i + 1] = quantized[i + 2] = 255
+      quantized[i + 3] = 0
       continue
     }
 
-    const distance = Math.sqrt(
-      Math.pow(pixelR - r, 2) +
-      Math.pow(pixelG - g, 2) +
-      Math.pow(pixelB - b, 2)
-    )
-
-    mask.push(distance < threshold)
+    quantized[i] = Math.round(data[i] / step) * step
+    quantized[i + 1] = Math.round(data[i + 1] / step) * step
+    quantized[i + 2] = Math.round(data[i + 2] / step) * step
+    quantized[i + 3] = 255
   }
 
-  return mask
+  return quantized
 }
 
-interface Region {
-  points: Array<{ x: number; y: number }>
-  opacity: number
+interface ColorLayer {
+  color: string
+  pixels: boolean[]
 }
 
-function findRegions(
-  mask: boolean[],
+function extractColorLayers(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number
+): ColorLayer[] {
+  const colorMap = new Map<string, number>()
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    if (a < 10) continue
+
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    const color = `rgb(${r},${g},${b})`
+    
+    colorMap.set(color, (colorMap.get(color) || 0) + 1)
+  }
+
+  const sortedColors = Array.from(colorMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([color]) => color)
+
+  return sortedColors.map(color => {
+    const [r, g, b] = color.match(/\d+/g)!.map(Number)
+    const pixels: boolean[] = []
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelR = data[i]
+      const pixelG = data[i + 1]
+      const pixelB = data[i + 2]
+      const pixelA = data[i + 3]
+
+      pixels.push(
+        pixelA >= 10 && 
+        pixelR === r && 
+        pixelG === g && 
+        pixelB === b
+      )
+    }
+
+    return { color, pixels }
+  })
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+function traceContours(
+  pixels: boolean[],
   width: number,
   height: number,
-  detailLevel: number
-): Region[] {
-  const regions: Region[] = []
-  const visited = new Array(mask.length).fill(false)
-  const step = Math.max(1, Math.floor(11 - detailLevel))
+  minSize: number
+): Point[][] {
+  const visited = new Array(pixels.length).fill(false)
+  const contours: Point[][] = []
 
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       const idx = y * width + x
-      if (mask[idx] && !visited[idx]) {
-        const region = floodFill(mask, visited, width, height, x, y, step)
-        if (region.points.length > 4) {
-          regions.push(region)
+      
+      if (pixels[idx] && !visited[idx]) {
+        const contour = marchingSquares(pixels, visited, width, height, x, y)
+        
+        if (contour.length >= minSize) {
+          contours.push(contour)
         }
       }
     }
   }
 
-  return regions
+  return contours
 }
 
-function floodFill(
-  mask: boolean[],
+function marchingSquares(
+  pixels: boolean[],
   visited: boolean[],
   width: number,
   height: number,
   startX: number,
-  startY: number,
-  step: number
-): Region {
-  const points: Array<{ x: number; y: number }> = []
-  const stack: Array<{ x: number; y: number }> = [{ x: startX, y: startY }]
+  startY: number
+): Point[] {
+  const contour: Point[] = []
+  const queue: Point[] = [{ x: startX, y: startY }]
 
-  while (stack.length > 0 && points.length < 1000) {
-    const { x, y } = stack.pop()!
+  while (queue.length > 0) {
+    const { x, y } = queue.shift()!
     const idx = y * width + x
 
     if (x < 0 || x >= width || y < 0 || y >= height) continue
-    if (visited[idx] || !mask[idx]) continue
+    if (visited[idx] || !pixels[idx]) continue
 
     visited[idx] = true
-    points.push({ x, y })
 
-    stack.push(
-      { x: x + step, y },
-      { x: x - step, y },
-      { x, y: y + step },
-      { x, y: y - step }
+    const isEdge = 
+      x === 0 || x === width - 1 || 
+      y === 0 || y === height - 1 ||
+      !pixels[idx - 1] ||
+      !pixels[idx + 1] ||
+      !pixels[idx - width] ||
+      !pixels[idx + width]
+
+    if (isEdge) {
+      contour.push({ x, y })
+    }
+
+    queue.push(
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 }
     )
   }
 
-  return {
-    points: convexHull(points),
-    opacity: 0.95
-  }
+  return simplifyContour(contour, 1.5)
 }
 
-function convexHull(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+function simplifyContour(points: Point[], tolerance: number): Point[] {
   if (points.length < 3) return points
 
-  points.sort((a, b) => a.x - b.x || a.y - b.y)
+  const douglasPeucker = (pts: Point[], eps: number): Point[] => {
+    if (pts.length < 3) return pts
 
-  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+    let maxDist = 0
+    let maxIndex = 0
+    const first = pts[0]
+    const last = pts[pts.length - 1]
 
-  const lower: Array<{ x: number; y: number }> = []
-  for (const p of points) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop()
+    for (let i = 1; i < pts.length - 1; i++) {
+      const dist = perpendicularDistance(pts[i], first, last)
+      if (dist > maxDist) {
+        maxDist = dist
+        maxIndex = i
+      }
     }
-    lower.push(p)
+
+    if (maxDist > eps) {
+      const left = douglasPeucker(pts.slice(0, maxIndex + 1), eps)
+      const right = douglasPeucker(pts.slice(maxIndex), eps)
+      return left.slice(0, -1).concat(right)
+    }
+
+    return [first, last]
   }
 
-  const upper: Array<{ x: number; y: number }> = []
-  for (let i = points.length - 1; i >= 0; i--) {
-    const p = points[i]
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop()
-    }
-    upper.push(p)
-  }
-
-  lower.pop()
-  upper.pop()
-
-  return lower.concat(upper)
+  return douglasPeucker(points, tolerance)
 }
 
-function regionToPath(region: Region, smoothing: number): string {
-  if (region.points.length < 2) return ''
+function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+  const dx = lineEnd.x - lineStart.x
+  const dy = lineEnd.y - lineStart.y
 
-  const smoothedPoints = smoothing > 0.5 
-    ? smoothPath(region.points, smoothing)
-    : region.points
+  if (dx === 0 && dy === 0) {
+    return Math.sqrt(
+      Math.pow(point.x - lineStart.x, 2) + 
+      Math.pow(point.y - lineStart.y, 2)
+    )
+  }
 
-  let path = `M ${smoothedPoints[0].x} ${smoothedPoints[0].y}`
+  const t = Math.max(0, Math.min(1,
+    ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy)
+  ))
 
-  for (let i = 1; i < smoothedPoints.length; i++) {
-    const point = smoothedPoints[i]
-    
-    if (smoothing > 0.3) {
-      const prev = smoothedPoints[i - 1]
-      const cpX = (prev.x + point.x) / 2
-      const cpY = (prev.y + point.y) / 2
-      path += ` Q ${prev.x} ${prev.y}, ${cpX} ${cpY}`
-    } else {
-      path += ` L ${point.x} ${point.y}`
+  const projX = lineStart.x + t * dx
+  const projY = lineStart.y + t * dy
+
+  return Math.sqrt(
+    Math.pow(point.x - projX, 2) + 
+    Math.pow(point.y - projY, 2)
+  )
+}
+
+function applyCatmullRomSpline(points: Point[], tension: number): Point[] {
+  if (points.length < 4) return points
+
+  const result: Point[] = []
+  const alpha = Math.min(0.5, tension)
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(points.length - 1, i + 2)]
+
+    const segments = 5
+    for (let t = 0; t < segments; t++) {
+      const tt = t / segments
+
+      const t2 = tt * tt
+      const t3 = t2 * tt
+
+      const x = 0.5 * (
+        2 * p1.x +
+        (-p0.x + p2.x) * tt +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+      )
+
+      const y = 0.5 * (
+        2 * p1.y +
+        (-p0.y + p2.y) * tt +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+      )
+
+      result.push({ 
+        x: p1.x * (1 - alpha) + x * alpha, 
+        y: p1.y * (1 - alpha) + y * alpha 
+      })
+    }
+  }
+
+  result.push(points[points.length - 1])
+  return result
+}
+
+function contourToPath(points: Point[], smoothness: number): string {
+  if (points.length < 2) return ''
+
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+
+  if (smoothness > 0.5 && points.length >= 3) {
+    for (let i = 1; i < points.length; i++) {
+      const curr = points[i]
+      const prev = points[i - 1]
+      const next = points[(i + 1) % points.length]
+
+      const cp1x = prev.x + (curr.x - prev.x) * 0.5
+      const cp1y = prev.y + (curr.y - prev.y) * 0.5
+      const cp2x = curr.x - (next.x - curr.x) * 0.25
+      const cp2y = curr.y - (next.y - curr.y) * 0.25
+
+      path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`
+    }
+  } else {
+    for (let i = 1; i < points.length; i++) {
+      path += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`
     }
   }
 
   path += ' Z'
   return path
-}
-
-function smoothPath(
-  points: Array<{ x: number; y: number }>,
-  factor: number
-): Array<{ x: number; y: number }> {
-  if (points.length < 3) return points
-
-  const smoothed: Array<{ x: number; y: number }> = [points[0]]
-  
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1]
-    const curr = points[i]
-    const next = points[i + 1]
-
-    const smoothedX = curr.x * (1 - factor) + (prev.x + next.x) / 2 * factor
-    const smoothedY = curr.y * (1 - factor) + (prev.y + next.y) / 2 * factor
-
-    smoothed.push({ x: smoothedX, y: smoothedY })
-  }
-
-  smoothed.push(points[points.length - 1])
-  return smoothed
 }
 
 export function formatFileSize(bytes: number): string {
