@@ -121,7 +121,7 @@ export function MultiFormatConverter() {
             <input
               id="multi-format-input"
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/webp,image/jpg"
               onChange={handleFileSelect}
               className="hidden"
             />

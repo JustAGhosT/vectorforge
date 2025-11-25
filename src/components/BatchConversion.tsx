@@ -80,7 +80,7 @@ export function BatchConversion({
         <input
           ref={batchFileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp"
+          accept="image/png,image/jpeg,image/webp,image/jpg"
           multiple
           className="hidden"
           onChange={(e) => onFileSelect(e.target.files)}
