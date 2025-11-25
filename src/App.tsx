@@ -13,6 +13,7 @@ import {
   Files,
   BookOpen,
   ArrowLeft,
+  Robot,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
@@ -23,6 +24,7 @@ import { useConversion } from '@/hooks/use-conversion'
 import { useBatchConversion } from '@/hooks/use-batch-conversion'
 import { useSettingsHistory } from '@/hooks/use-settings-history'
 import { useAIOptimizer } from '@/hooks/use-ai-optimizer'
+import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
@@ -33,6 +35,7 @@ import { FormatGuide } from '@/components/FormatGuide'
 import { MultiFormatConverter } from '@/components/MultiFormatConverter'
 import { AISuggestionCard } from '@/components/AISuggestionCard'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
+import { IterativeConverter } from '@/components/IterativeConverter'
 
 function App() {
   const isMobile = useIsMobile()
@@ -91,7 +94,22 @@ function App() {
     clearSuggestion,
   } = useAIOptimizer()
 
-  const isProcessing = isConversionProcessing || isBatchProcessing
+  const {
+    config: iterativeConfig,
+    updateConfig: updateIterativeConfig,
+    isProcessing: isIterativeProcessing,
+    currentIteration,
+    progress: iterativeProgress,
+    iterations,
+    bestIteration,
+    handleIterativeConversion,
+    cancelConversion: cancelIterative,
+  } = useIterativeConversion({
+    maxIterations: 5,
+    targetLikeness: 80,
+  })
+
+  const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -243,6 +261,27 @@ function App() {
     [handleFileSelect, handleBatchFilesSelect, setHistory]
   )
 
+  const handleStartIterativeConversion = useCallback(async () => {
+    if (!currentFile) {
+      toast.error('No image selected', {
+        description: 'Please upload an image first',
+      })
+      return
+    }
+
+    const result = await handleIterativeConversion(currentFile, settings)
+    
+    if (result) {
+      setCurrentJob(result.job)
+      updateSettings(result.settingsUsed)
+      setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+      
+      toast.success('Iterative conversion complete!', {
+        description: `Best result: ${result.likenessScore}% likeness`,
+      })
+    }
+  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob])
+
   useKeyboardShortcuts(
     {
       onUpload: () => fileInputRef.current?.click(),
@@ -347,10 +386,14 @@ function App() {
             />
 
             <Tabs defaultValue="convert" className="w-full">
-              <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-4">
+              <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-5">
                 <TabsTrigger value="convert" className="gap-2">
                   <UploadSimple weight="bold" className="w-4 h-4" />
                   <span className="hidden sm:inline">Convert</span>
+                </TabsTrigger>
+                <TabsTrigger value="iterative" className="gap-2">
+                  <Robot weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">AI Iterative</span>
                 </TabsTrigger>
                 <TabsTrigger value="batch" className="gap-2">
                   <Files weight="bold" className="w-4 h-4" />
@@ -418,6 +461,57 @@ function App() {
                   isAIOptimizing={isAnalyzing}
                 />
                 <SettingsInfoCard />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="iterative" className="space-y-4 md:space-y-6">
+            <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
+              <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                <UploadZone
+                  isProcessing={isIterativeProcessing}
+                  progress={iterativeProgress}
+                  isDragging={isDragging}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onFileSelect={handleSingleFileSelect}
+                />
+
+                <ConversionPreview
+                  job={bestIteration?.job || currentJob}
+                  zoomLevel={zoomLevel}
+                  dividerPosition={dividerPosition}
+                  onZoomIn={handleZoomIn}
+                  onZoomOut={handleZoomOut}
+                  onZoomReset={handleZoomReset}
+                  onDividerChange={setDividerPosition}
+                  onDownload={handleDownload}
+                  onNewImage={() => fileInputRef.current?.click()}
+                  onZoomChange={setZoomLevel}
+                  onRetry={handleStartIterativeConversion}
+                />
+              </div>
+
+              <div className="space-y-4 md:space-y-6">
+                <IterativeConverter
+                  maxIterations={iterativeConfig.maxIterations}
+                  targetLikeness={iterativeConfig.targetLikeness}
+                  onMaxIterationsChange={(value) =>
+                    updateIterativeConfig({ maxIterations: value })
+                  }
+                  onTargetLikenessChange={(value) =>
+                    updateIterativeConfig({ targetLikeness: value })
+                  }
+                  isProcessing={isIterativeProcessing}
+                  currentIteration={currentIteration}
+                  progress={iterativeProgress}
+                  iterations={iterations}
+                  bestIteration={bestIteration}
+                  onStart={handleStartIterativeConversion}
+                  onCancel={cancelIterative}
+                  canStart={!!currentFile}
+                />
               </div>
             </div>
           </TabsContent>
