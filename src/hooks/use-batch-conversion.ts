@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
-  convertMultiplePngs,
+  convertMultipleImages,
   downloadAllAsZip,
   type ConversionJob,
   type ConversionSettings,
@@ -16,27 +16,27 @@ export function useBatchConversion(settings: ConversionSettings) {
   const handleBatchFilesSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    const pngFiles = Array.from(files).filter((file) =>
-      file.type.startsWith('image/png')
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
     )
 
-    if (pngFiles.length === 0) {
-      toast.error('No PNG files found', {
-        description: 'Please select PNG image files',
+    if (imageFiles.length === 0) {
+      toast.error('No image files found', {
+        description: 'Please select image files (PNG, JPG, WebP)',
       })
       return
     }
 
-    if (pngFiles.length > 50) {
+    if (imageFiles.length > 50) {
       toast.error('Too many files', {
         description: 'Please select up to 50 files at a time',
       })
       return
     }
 
-    setBatchFiles(pngFiles)
+    setBatchFiles(imageFiles)
     setBatchJobs([])
-    toast.info(`${pngFiles.length} files selected`, {
+    toast.info(`${imageFiles.length} files selected`, {
       description: 'Ready to convert',
     })
   }, [])
@@ -53,7 +53,7 @@ export function useBatchConversion(settings: ConversionSettings) {
     setBatchJobs([])
 
     try {
-      const jobs = await convertMultiplePngs(
+      const jobs = await convertMultipleImages(
         batchFiles,
         settings,
         (completed, total) => {

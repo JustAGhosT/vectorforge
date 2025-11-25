@@ -85,12 +85,12 @@ function App() {
       setIsDragging(false)
 
       const files = Array.from(e.dataTransfer.files).filter((file) =>
-        file.type.startsWith('image/png')
+        file.type.startsWith('image/')
       )
 
       if (files.length === 0) {
-        toast.error('No PNG files found', {
-          description: 'Please drop PNG image files',
+        toast.error('No image files found', {
+          description: 'Please drop image files (PNG, JPG, WebP)',
         })
         return
       }
@@ -122,7 +122,7 @@ function App() {
   const handleDownload = useCallback((job: ConversionJob) => {
     const a = document.createElement('a')
     a.href = job.svgDataUrl
-    a.download = job.filename.replace(/\.png$/i, '.svg')
+    a.download = job.filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.svg')
     a.click()
     toast.success('Downloaded!', {
       description: `${a.download}`,
@@ -267,7 +267,7 @@ function App() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
               multiple
               className="hidden"
               onChange={(e) => handleSingleFileSelect(e.target.files)}

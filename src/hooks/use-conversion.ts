@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
-  convertPngToSvg,
+  convertImageToSvg,
   generateJobId,
   type ConversionJob,
   type ConversionSettings,
@@ -16,9 +16,9 @@ export function useConversion(settings: ConversionSettings) {
 
   const handleFileSelect = useCallback(
     async (file: File) => {
-      if (!file.type.startsWith('image/png')) {
+      if (!file.type.startsWith('image/')) {
         toast.error('Invalid file type', {
-          description: 'Please upload a PNG image file',
+          description: 'Please upload an image file (PNG, JPG, WebP)',
         })
         return null
       }
@@ -45,7 +45,7 @@ export function useConversion(settings: ConversionSettings) {
           reader.readAsDataURL(file)
         })
 
-        const { svgDataUrl, svgSize } = await convertPngToSvg(file, settings)
+        const { svgDataUrl, svgSize } = await convertImageToSvg(file, settings)
 
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current)

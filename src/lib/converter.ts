@@ -27,7 +27,7 @@ export interface BatchConversionJob {
   status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
-export async function convertPngToSvg(
+export async function convertImageToSvg(
   file: File,
   settings: ConversionSettings
 ): Promise<{ svgDataUrl: string; svgSize: number }> {
@@ -325,7 +325,7 @@ export function generateJobId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
-export async function convertMultiplePngs(
+export async function convertMultipleImages(
   files: File[],
   settings: ConversionSettings,
   onProgress?: (completed: number, total: number) => void
@@ -342,7 +342,7 @@ export async function convertMultiplePngs(
         reader.readAsDataURL(file)
       })
 
-      const { svgDataUrl, svgSize } = await convertPngToSvg(file, settings)
+      const { svgDataUrl, svgSize } = await convertImageToSvg(file, settings)
 
       const job: ConversionJob = {
         id: generateJobId(),
@@ -387,7 +387,7 @@ export function downloadAllAsZip(jobs: ConversionJob[]): void {
     if (job.status === 'completed' && job.svgDataUrl) {
       const a = document.createElement('a')
       a.href = job.svgDataUrl
-      a.download = job.filename.replace(/\.png$/i, '.svg')
+      a.download = job.filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.svg')
       a.click()
     }
   })

@@ -80,7 +80,7 @@ export function BatchConversion({
         <input
           ref={batchFileInputRef}
           type="file"
-          accept="image/png"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
           multiple
           className="hidden"
           onChange={(e) => onFileSelect(e.target.files)}
@@ -95,7 +95,7 @@ export function BatchConversion({
             <Files className="w-6 h-6 md:w-8 md:h-8 text-primary" weight="bold" />
           </div>
           <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">
-            Select multiple PNG files
+            Select multiple image files
           </h3>
           <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
             Upload up to 50 files at once (10MB each max)

@@ -45,10 +45,10 @@ export function UploadZone({
         onClick={() => fileInputRef.current?.click()}
       >
         <input
-          id="png-file-input"
+          id="image-file-input"
           ref={fileInputRef}
           type="file"
-          accept="image/png"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
           multiple={acceptMultiple}
           className="hidden"
           onChange={(e) => onFileSelect(e.target.files)}
@@ -67,10 +67,10 @@ export function UploadZone({
               />
             </div>
             <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">
-              Drop your PNG here or click to upload
+              Drop your image here or click to upload
             </h3>
             <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-              Maximum file size: 10MB
+              Supports PNG, JPG, WebP • Maximum file size: 10MB
             </p>
             <Button variant="outline" size="sm" className="min-h-[44px] md:min-h-0">
               Select File
