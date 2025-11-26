@@ -931,6 +931,82 @@ function App() {
         </motion.div>
       )}
 
+      {/* Mobile Activity Panel Sheet */}
+      {isMobile && currentPage === 'converter' && (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              size="icon"
+              className="fixed bottom-20 right-4 h-12 w-12 rounded-full shadow-lg z-40"
+              aria-label="Open activity panel"
+            >
+              <Activity className="w-5 h-5" weight="bold" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[85vw] p-0">
+            <div className="flex flex-col h-full">
+              {/* Panel Tabs */}
+              <div className="flex gap-1 p-3 bg-muted/50 border-b">
+                <Button
+                  variant={rightPanelTab === 'activity' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="flex-1 gap-1.5 h-9"
+                  onClick={() => setRightPanelTab('activity')}
+                >
+                  <Activity className="w-3.5 h-3.5" weight="bold" />
+                  Activity
+                </Button>
+                <Button
+                  variant={rightPanelTab === 'chat' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="flex-1 gap-1.5 h-9"
+                  onClick={() => setRightPanelTab('chat')}
+                >
+                  <ChatCircle className="w-3.5 h-3.5" weight="bold" />
+                  AI Edit
+                </Button>
+                <Button
+                  variant={rightPanelTab === 'postprocess' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="flex-1 gap-1.5 h-9"
+                  onClick={() => setRightPanelTab('postprocess')}
+                >
+                  <Sparkle className="w-3.5 h-3.5" weight="bold" />
+                  Process
+                </Button>
+              </div>
+              
+              {/* Panel Content */}
+              <div className="flex-1 overflow-hidden">
+                {rightPanelTab === 'activity' && (
+                  <ActivityLogPanel
+                    entries={activityEntries}
+                    onClear={clearActivityEntries}
+                    className="h-full border-0 rounded-none"
+                  />
+                )}
+                {rightPanelTab === 'chat' && (
+                  <AIChatPanel
+                    currentSvg={currentSvgContent}
+                    onApplySvgChange={handleApplySvgChange}
+                    onActivityLog={(title, desc) => logActivity(title, desc, 'ai-chat')}
+                    className="h-full border-0 rounded-none"
+                  />
+                )}
+                {rightPanelTab === 'postprocess' && (
+                  <SvgPostProcessingPanel
+                    currentSvg={currentSvgContent}
+                    onApplyChange={handleApplySvgChange}
+                    onActivityLog={(title, desc) => logActivity(title, desc, 'settings', 'success')}
+                    className="h-full border-0 rounded-none"
+                  />
+                )}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
       <footer className="border-t border-border mt-8 md:mt-16">
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 text-xs md:text-sm text-muted-foreground">
