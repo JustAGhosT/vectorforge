@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { motion } from 'framer-motion'
 import {
   UploadSimple,
@@ -15,6 +16,9 @@ import {
   ArrowLeft,
   Robot,
   WarningCircle,
+  Activity,
+  ChatCircle,
+  SidebarSimple,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
@@ -28,6 +32,7 @@ import { useSettingsHistory } from '@/hooks/use-settings-history'
 import { useAIOptimizer } from '@/hooks/use-ai-optimizer'
 import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
 import { useErrorStore } from '@/hooks/use-error-store'
+import { useActivityLog } from '@/hooks/use-activity-log'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
@@ -38,6 +43,9 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { SkipLink, LiveRegion } from '@/components/AccessibilityComponents'
 import { SettingsHistoryTimeline } from '@/components/SettingsHistoryTimeline'
 import { ErrorLogDialog } from '@/components/ErrorLogDialog'
+import { ActivityLogPanel } from '@/components/ActivityLogPanel'
+import { AIChatPanel } from '@/components/AIChatPanel'
+import { SvgPostProcessingPanel } from '@/components/SvgPostProcessingPanel'
 
 // Lazy load heavy components for code splitting
 const BatchConversion = lazy(() => import('@/components/BatchConversion').then(m => ({ default: m.BatchConversion })))
@@ -69,9 +77,18 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [enableAIIterative, setEnableAIIterative] = useState(false)
   const [showErrorLog, setShowErrorLog] = useState(false)
+  const [showRightPanel, setShowRightPanel] = useState(true)
+  const [rightPanelTab, setRightPanelTab] = useState<'activity' | 'chat' | 'postprocess'>('activity')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [currentSvgContent, setCurrentSvgContent] = useState<string | null>(null)
 
   const { errors, addError, removeError, clearErrors, hasErrors, errorCount } = useErrorStore()
+  const { entries: activityEntries, addEntry: addActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
+
+  // Helper function to add activity log entries
+  const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error') => {
+    return addActivityEntry({ title, description, type, status })
+  }, [addActivityEntry])
 
   const {
     settings,
@@ -149,14 +166,17 @@ function App() {
         toast.error('No image files found', {
           description: 'Please drop image files (PNG, JPG, WebP)',
         })
+        logActivity('Invalid file drop', 'No valid image files were found', 'error', 'error')
         return
       }
 
       if (files.length === 1) {
         // Clear previous job before processing new file
         clearJob()
+        logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
+          logActivity('Conversion complete', `${files[0].name} converted successfully`, 'conversion', 'success')
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
           // If AI Iterative is enabled, run iterative conversion after initial conversion
@@ -164,6 +184,7 @@ function App() {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
+            logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
             
             try {
               const result = await handleIterativeConversion(files[0], settings)
@@ -171,6 +192,7 @@ function App() {
                 setCurrentJob(result.job)
                 updateSettings(result.settingsUsed)
                 setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+                logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
                 
                 toast.success('AI Iterative Refinement Complete!', {
                   description: `Best result: ${result.likenessScore}% likeness`,
@@ -178,6 +200,7 @@ function App() {
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
+              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error')
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
@@ -195,11 +218,12 @@ function App() {
           }
         }
       } else {
+        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'pending')
         handleBatchFilesSelect(files as unknown as FileList)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -217,10 +241,11 @@ function App() {
     a.href = job.svgDataUrl
     a.download = job.filename.replace(/\.(png|jpg|jpeg|webp)$/i, '.svg')
     a.click()
+    logActivity('Downloaded SVG', `${a.download}`, 'download', 'success')
     toast.success('Downloaded!', {
       description: `${a.download}`,
     })
-  }, [])
+  }, [logActivity])
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel((prev) => Math.min(prev + 0.25, 3))
@@ -259,11 +284,13 @@ function App() {
   }, [handleBatchConvert, setHistory])
 
   const handleReconvertAndSave = useCallback(async () => {
+    logActivity('Reconverting', 'Applying new settings', 'conversion', 'pending')
     const job = await handleReconvert()
     if (job) {
+      logActivity('Reconversion complete', 'Settings applied successfully', 'conversion', 'success')
       setHistory((current) => [job, ...(current || [])].slice(0, 20))
     }
-  }, [handleReconvert, setHistory])
+  }, [handleReconvert, setHistory, logActivity])
 
   const handleAIOptimize = useCallback(async () => {
     if (!currentJob) {
@@ -273,13 +300,16 @@ function App() {
 
     try {
       clearSuggestion()
+      logActivity('AI Analysis started', 'Analyzing image characteristics...', 'ai-analysis', 'pending')
       const aiSuggestion = await analyzeImage(currentJob.pngDataUrl, settings)
+      logActivity('AI Analysis complete', `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`, 'ai-analysis', 'success')
       
       toast.success('AI Analysis Complete', {
         description: `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`,
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Could not analyze image'
+      logActivity('AI Analysis failed', errorMessage, 'ai-analysis', 'error')
       
       // Add to error store for persistent tracking
       addError({
@@ -298,11 +328,12 @@ function App() {
         },
       })
     }
-  }, [currentJob, settings, analyzeImage, clearSuggestion, addError])
+  }, [currentJob, settings, analyzeImage, clearSuggestion, addError, logActivity])
 
   const handleApplyAISuggestion = useCallback(
     async (suggestedSettings: { complexity: number; colorSimplification: number; pathSmoothing: number }) => {
       updateSettings(suggestedSettings)
+      logActivity('AI suggestion applied', 'Applying recommended settings', 'ai-suggestion', 'pending')
       
       toast.info('Applying AI suggestions...', {
         description: 'Reconverting with optimal settings',
@@ -312,17 +343,38 @@ function App() {
         const job = await handleReconvert()
         if (job) {
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
+          logActivity('AI optimization complete', 'Conversion updated with AI settings', 'ai-suggestion', 'success')
           toast.success('AI optimization applied successfully!')
         }
         clearSuggestion()
       }, 100)
     },
-    [updateSettings, handleReconvert, setHistory, clearSuggestion]
+    [updateSettings, handleReconvert, setHistory, clearSuggestion, logActivity]
   )
+
+  // Handle SVG modifications from AI Chat
+  const handleApplySvgChange = useCallback((newSvg: string) => {
+    if (!currentJob) return
+    
+    // Create a blob and URL from the new SVG
+    const svgBlob = new Blob([newSvg], { type: 'image/svg+xml' })
+    const svgDataUrl = URL.createObjectURL(svgBlob)
+    
+    // Update the current job with the modified SVG
+    const updatedJob: ConversionJob = {
+      ...currentJob,
+      svgDataUrl,
+      svgSize: newSvg.length,
+    }
+    
+    setCurrentJob(updatedJob)
+    logActivity('SVG modified', 'Applied AI-generated modification', 'ai-chat', 'success')
+  }, [currentJob, setCurrentJob, logActivity])
 
   const handleApplyPreset = useCallback(
     async (preset: ConversionPreset) => {
       updateSettings(preset.settings)
+      logActivity('Preset applied', `Using "${preset.name}" preset`, 'settings', 'success')
       
       toast.success(`Applied "${preset.name}" preset`, {
         description: preset.description,
@@ -343,7 +395,7 @@ function App() {
         }, 100)
       }
     },
-    [updateSettings, currentFile, handleReconvert, setHistory]
+    [updateSettings, currentFile, handleReconvert, setHistory, logActivity]
   )
 
   const handleSingleFileSelect = useCallback(
@@ -353,8 +405,10 @@ function App() {
       if (files.length === 1) {
         // Clear previous job before processing new file
         clearJob()
+        logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
+          logActivity('Conversion complete', `${files[0].name} converted successfully`, 'conversion', 'success')
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
           // If AI Iterative is enabled, run iterative conversion after initial conversion
@@ -362,6 +416,7 @@ function App() {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
+            logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
             
             try {
               const result = await handleIterativeConversion(files[0], settings)
@@ -369,6 +424,7 @@ function App() {
                 setCurrentJob(result.job)
                 updateSettings(result.settingsUsed)
                 setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+                logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
                 
                 toast.success('AI Iterative Refinement Complete!', {
                   description: `Best result: ${result.likenessScore}% likeness`,
@@ -376,6 +432,7 @@ function App() {
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
+              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error')
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
@@ -393,11 +450,12 @@ function App() {
           }
         }
       } else {
+        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'pending')
         handleBatchFilesSelect(files)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {
@@ -463,6 +521,27 @@ function App() {
     return cleanup
   }, [])
 
+  // Extract SVG content from blob URL when job changes
+  useEffect(() => {
+    const extractSvgContent = async () => {
+      if (!currentJob?.svgDataUrl) {
+        setCurrentSvgContent(null)
+        return
+      }
+      
+      try {
+        const response = await fetch(currentJob.svgDataUrl)
+        const text = await response.text()
+        setCurrentSvgContent(text)
+      } catch (error) {
+        console.error('Failed to extract SVG content:', error)
+        setCurrentSvgContent(null)
+      }
+    }
+    
+    extractSvgContent()
+  }, [currentJob?.svgDataUrl])
+
   // Handle restoring settings from history
   const handleRestoreSettings = useCallback((index: number) => {
     if (settingsHistory[index]) {
@@ -513,6 +592,18 @@ function App() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Right Panel Toggle */}
+              {!isMobile && currentPage === 'converter' && (
+                <Button
+                  variant={showRightPanel ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setShowRightPanel(!showRightPanel)}
+                  aria-label={showRightPanel ? 'Hide activity panel' : 'Show activity panel'}
+                  title={showRightPanel ? 'Hide activity panel' : 'Show activity panel'}
+                >
+                  <SidebarSimple className="w-4 h-4" weight="bold" />
+                </Button>
+              )}
               <ThemeToggle />
               <Button
                 variant={currentPage === 'formats' ? 'default' : 'outline'}
@@ -554,6 +645,9 @@ function App() {
               aria-label="Select image file to convert"
             />
 
+            <div className="flex gap-6">
+              {/* Main content area */}
+              <div className={showRightPanel && !isMobile ? 'flex-1' : 'w-full'}>
             <Tabs defaultValue="convert" className="w-full">
               <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-5">
                 <TabsTrigger value="convert" className="gap-2">
@@ -736,6 +830,76 @@ function App() {
             </Suspense>
           </TabsContent>
         </Tabs>
+              </div>
+              
+              {/* Right Panel - Activity Log, AI Chat, Post-Processing */}
+              {showRightPanel && !isMobile && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="w-80 shrink-0 space-y-4"
+                >
+                  {/* Panel Tabs */}
+                  <div className="flex gap-1 p-1 bg-muted rounded-lg">
+                    <Button
+                      variant={rightPanelTab === 'activity' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1 gap-1.5 h-8"
+                      onClick={() => setRightPanelTab('activity')}
+                    >
+                      <Activity className="w-3.5 h-3.5" weight="bold" />
+                      Activity
+                    </Button>
+                    <Button
+                      variant={rightPanelTab === 'chat' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1 gap-1.5 h-8"
+                      onClick={() => setRightPanelTab('chat')}
+                    >
+                      <ChatCircle className="w-3.5 h-3.5" weight="bold" />
+                      AI Edit
+                    </Button>
+                    <Button
+                      variant={rightPanelTab === 'postprocess' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1 gap-1.5 h-8"
+                      onClick={() => setRightPanelTab('postprocess')}
+                    >
+                      <Sparkle className="w-3.5 h-3.5" weight="bold" />
+                      Process
+                    </Button>
+                  </div>
+                  
+                  {/* Panel Content */}
+                  <div className="h-[calc(100vh-280px)] min-h-[400px]">
+                    {rightPanelTab === 'activity' && (
+                      <ActivityLogPanel
+                        entries={activityEntries}
+                        onClear={clearActivityEntries}
+                        className="h-full"
+                      />
+                    )}
+                    {rightPanelTab === 'chat' && (
+                      <AIChatPanel
+                        currentSvg={currentSvgContent}
+                        onApplySvgChange={handleApplySvgChange}
+                        onActivityLog={(title, desc) => logActivity(title, desc, 'ai-chat')}
+                        className="h-full"
+                      />
+                    )}
+                    {rightPanelTab === 'postprocess' && (
+                      <SvgPostProcessingPanel
+                        currentSvg={currentSvgContent}
+                        onApplyChange={handleApplySvgChange}
+                        onActivityLog={(title, desc) => logActivity(title, desc, 'settings', 'success')}
+                        className="h-full"
+                      />
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </div>
         </>
         )}
       </main>
