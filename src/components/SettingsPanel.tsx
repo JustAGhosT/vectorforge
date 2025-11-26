@@ -8,10 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning } from '@phosphor-icons/react'
 import { ConversionSettings } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { PresetSelector } from '@/components/PresetSelector'
+import type { ConversionPreset } from '@/lib/presets'
 
 interface SettingsPanelProps {
   settings: ConversionSettings
   onSettingChange: (key: keyof ConversionSettings, value: number | boolean) => void
+  onApplyPreset?: (preset: ConversionPreset) => void
   onReconvert?: () => void
   canReconvert: boolean
   isProcessing: boolean
@@ -26,6 +29,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({
   settings,
   onSettingChange,
+  onApplyPreset,
   onReconvert,
   canReconvert,
   isProcessing,
@@ -40,6 +44,18 @@ export function SettingsPanel({
 
   const SettingsContent = () => (
     <div className="space-y-6">
+      {/* Quick Presets */}
+      {onApplyPreset && (
+        <>
+          <PresetSelector
+            settings={settings}
+            onApplyPreset={onApplyPreset}
+            disabled={isProcessing}
+          />
+          <Separator />
+        </>
+      )}
+      
       {onAIOptimize && canReconvert && (
         <>
           <Button

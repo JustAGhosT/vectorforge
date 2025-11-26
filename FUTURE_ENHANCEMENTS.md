@@ -24,6 +24,12 @@ This document outlines planned improvements and features for VectorForge, organi
   - WebAssembly-compiled Potrace for 5-10x speedup on tracing
   - Falls back gracefully if WASM not supported
 
+- [x] **Custom Presets** - Quick settings for different image types
+  - 5 built-in presets: Logo, Icon, Illustration, Photo, Minimal
+  - Dropdown selector in Settings panel
+  - Auto-reconvert when preset applied with active image
+  - Located in `src/lib/presets.ts` and `src/components/PresetSelector.tsx`
+
 ---
 
 ## 🔮 Future Enhancements
@@ -47,43 +53,15 @@ This document outlines planned improvements and features for VectorForge, organi
 
 ---
 
-### Custom Presets (Nice to Have)
+### ~~Custom Presets~~ ✅ COMPLETED
 
-**Goal**: Allow users to save, share, and load custom conversion presets.
+Built-in presets implemented with 5 image type presets (Logo, Icon, Illustration, Photo, Minimal).
+See `src/lib/presets.ts` and `src/components/PresetSelector.tsx`.
 
-**Implementation Plan**:
-1. Create preset data structure:
-   ```typescript
-   interface ConversionPreset {
-     id: string
-     name: string
-     description?: string
-     settings: ConversionSettings
-     imageType?: 'logo' | 'icon' | 'illustration' | 'photo'
-     createdAt: number
-   }
-   ```
-
-2. Add preset management UI:
-   - Save current settings as preset button
-   - Preset dropdown/modal in SettingsPanel
-   - Import/export presets as JSON
-
-3. Persist presets using Spark KV or localStorage
-
-4. Add built-in presets:
-   - "Logo - High Contrast"
-   - "Icon - Clean Lines"
-   - "Illustration - Detailed"
-   - "Photo - Maximum Detail"
-   - "Minimal - Small File Size"
-
-**Files to create**:
-- `src/components/PresetManager.tsx`
-- `src/hooks/use-presets.ts`
-- `src/lib/presets.ts`
-
-**Estimated effort**: 2-3 days
+**Future extensions**:
+- User-defined custom presets saved to localStorage
+- Import/export presets as JSON
+- Preset sharing via URL parameters
 
 ---
 

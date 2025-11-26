@@ -17,6 +17,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
+import type { ConversionPreset } from '@/lib/presets'
 import { setupConnectionMonitoring } from '@/lib/connection'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
@@ -256,6 +257,32 @@ function App() {
     [updateSettings, handleReconvert, setHistory, clearSuggestion]
   )
 
+  const handleApplyPreset = useCallback(
+    async (preset: ConversionPreset) => {
+      updateSettings(preset.settings)
+      
+      toast.success(`Applied "${preset.name}" preset`, {
+        description: preset.description,
+      })
+
+      // Auto-reconvert if we have a file
+      if (currentFile) {
+        setTimeout(() => {
+          handleReconvert()
+            .then((job) => {
+              if (job) {
+                setHistory((current) => [job, ...(current || [])].slice(0, 20))
+              }
+            })
+            .catch((error) => {
+              console.error('Failed to reconvert after preset:', error)
+            })
+        }, 100)
+      }
+    },
+    [updateSettings, currentFile, handleReconvert, setHistory]
+  )
+
   const handleSingleFileSelect = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return
@@ -467,6 +494,7 @@ function App() {
                 <SettingsPanel
                   settings={settings}
                   onSettingChange={handleSettingChange}
+                  onApplyPreset={handleApplyPreset}
                   onReconvert={handleReconvertAndSave}
                   canReconvert={!!currentFile}
                   isProcessing={isProcessing}
