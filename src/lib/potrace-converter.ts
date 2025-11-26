@@ -58,8 +58,9 @@ function settingsToPotraceOptions(settings: ConversionSettings): PotraceOptions 
   const { complexity, colorSimplification, pathSmoothing } = settings
 
   return {
-    // Turn policy: 4 = minority, 5 = majority (using numeric values)
-    turnpolicy: complexity > 0.5 ? 4 : 5,
+    // Turn policy: 4 = minority (default), use minority for complex images
+    // Based on esm-potrace-wasm defaults: turnpolicy:4
+    turnpolicy: 4,
     
     // Turd size: Remove smaller noise for higher simplification
     turdsize: Math.floor(2 + (1 - complexity) * 10),
