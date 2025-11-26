@@ -2,12 +2,12 @@
 
 > **Smart Image Converter** — Transform images into professional-quality, infinitely scalable SVG graphics with AI-powered optimization.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-VectorForge-7c3aed?style=for-the-badge)](https://spark.github.dev/JustAGhosT/vectorforge)
-[![GitHub Spark](https://img.shields.io/badge/Powered%20by-GitHub%20Spark-000?style=for-the-badge&logo=github)](https://githubnext.com/projects/github-spark)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-VectorForge-7c3aed?style=for-the-badge)](https://vectorforge.netlify.app)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/vectorforge/deploy-status)](https://app.netlify.com/sites/vectorforge/deploys)
 
 ## 🚀 Try It Now
 
-**[Launch VectorForge →](https://spark.github.dev/JustAGhosT/vectorforge)**
+**[Launch VectorForge →](https://vectorforge.netlify.app)**
 
 ---
 
@@ -59,7 +59,7 @@
 
 ### Quick Start (No Installation)
 
-1. **[Open VectorForge](https://spark.github.dev/JustAGhosT/vectorforge)** in your browser
+1. **[Open VectorForge](https://vectorforge.netlify.app)** in your browser
 2. **Drop an image** or click to upload (PNG, JPG, WebP)
 3. **Adjust settings** using the sliders or click "AI Optimize"
 4. **Download** your converted SVG
@@ -137,7 +137,7 @@ VectorForge includes AI-powered analysis to automatically optimize your conversi
    - Potential warnings
 4. **Apply or adjust** the suggestions
 
-> 📝 **Note**: AI features require the Spark runtime. See [Environment Setup](./ENVIRONMENT_SETUP.md) for configuration.
+> 📝 **Note**: AI features require Azure AI or OpenAI configuration. See [Environment Setup](./ENVIRONMENT_SETUP.md) for configuration.
 
 ---
 
@@ -205,7 +205,8 @@ npm run lint     # Run linter
 - **Animations**: Framer Motion
 - **Icons**: Phosphor Icons
 - **Build**: Vite
-- **Runtime**: GitHub Spark
+- **Hosting**: Netlify
+- **AI**: Azure AI / OpenAI GPT-4o
 
 ---
 
@@ -230,6 +231,4 @@ npm run lint     # Run linter
 
 ## 📄 License
 
-This project is built with the [GitHub Spark](https://githubnext.com/projects/github-spark) platform.
-
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+MIT License - See [LICENSE](./LICENSE) for details.
