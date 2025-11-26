@@ -30,26 +30,34 @@ This document outlines planned improvements and features for VectorForge, organi
   - Auto-reconvert when preset applied with active image
   - Located in `src/lib/presets.ts` and `src/components/PresetSelector.tsx`
 
+- [x] **Progressive Loading** - Improved perceived performance
+  - Skeleton components for loading states (`src/components/Skeleton.tsx`)
+  - ProgressiveImage component with lazy loading (`src/components/ProgressiveImage.tsx`)
+  - Intersection Observer for on-demand image loading
+  - Blur-up effect and error handling
+
+- [x] **Undo History Visualization** - Visual timeline of settings changes
+  - SettingsHistoryTimeline component (`src/components/SettingsHistoryTimeline.tsx`)
+  - Shows all settings changes with timestamps
+  - Click to restore any previous state
+  - Displays what changed between each state
+
+- [x] **Accessibility Improvements** - WCAG 2.1 AA compliance enhancements
+  - Skip to main content link for keyboard users
+  - ARIA labels and roles throughout
+  - Live regions for screen reader announcements
+  - Accessibility utilities (`src/lib/accessibility.ts`)
+  - Focus trap hook for modals
+  - Reduced motion support
+
 ---
 
 ## 🔮 Future Enhancements
 
-### Progressive Loading (Medium Priority)
+### ~~Progressive Loading~~ ✅ COMPLETED
 
-**Goal**: Lazy load images and implement progressive rendering for better perceived performance.
-
-**Implementation Plan**:
-1. Add blur-up placeholder technique for image previews
-2. Implement intersection observer for lazy loading history items
-3. Add skeleton loaders for conversion results
-4. Progressive SVG rendering (show partial results during conversion)
-
-**Files to modify**:
-- `src/components/ConversionPreview.tsx`
-- `src/components/ConversionHistory.tsx`
-- Create `src/components/ProgressiveImage.tsx`
-
-**Estimated effort**: 1-2 days
+Implemented with skeleton loaders, ProgressiveImage component, and intersection observer.
+See `src/components/ProgressiveImage.tsx` and `src/components/Skeleton.tsx`.
 
 ---
 
@@ -95,51 +103,41 @@ See `src/lib/presets.ts` and `src/components/PresetSelector.tsx`.
 
 ---
 
-### Undo History Visualization (Nice to Have)
+### ~~Undo History Visualization~~ ✅ COMPLETED
 
-**Goal**: Visual timeline of settings changes with thumbnail previews.
+Visual timeline implemented showing all settings changes.
+See `src/components/SettingsHistoryTimeline.tsx`.
 
-**Implementation Plan**:
-1. Capture thumbnail at each settings change
-2. Create visual timeline component
-3. Allow clicking on history point to restore state
-4. Add branching support (undo, make changes, creates new branch)
+**Features implemented**:
+- Timeline of all settings changes with timestamps
+- Shows what changed between each state
+- Click any item to restore that state
+- Current state highlighted
 
-**UI Concept**:
-```
-[Settings History]
-├── [Thumb] Initial → Complexity: 50%, Colors: 50%, Smooth: 50%
-├── [Thumb] Change 1 → Complexity: 70%
-├── [Thumb] Change 2 → Colors: 30%
-└── [Thumb] Current → Smooth: 80%
-```
-
-**Files to create**:
-- `src/components/SettingsHistoryTimeline.tsx`
-- `src/hooks/use-settings-history-enhanced.ts`
-
-**Estimated effort**: 2-3 days
+**Future extensions**:
+- Thumbnail previews at each state
+- Branching support for complex workflows
 
 ---
 
-### Accessibility Audit (Nice to Have)
+### ~~Accessibility Audit~~ ✅ COMPLETED
 
-**Goal**: Ensure WCAG 2.1 AA compliance across the application.
+Accessibility improvements implemented across the application.
 
-**Checklist**:
-- [ ] Keyboard navigation for all interactive elements
-- [ ] Screen reader compatibility
-- [ ] Focus indicators and management
-- [ ] Color contrast ratios
-- [ ] Alternative text for images
-- [ ] ARIA labels and roles
-- [ ] Reduced motion support
-- [ ] Error message accessibility
+**Completed items**:
+- [x] Skip to main content link for keyboard users
+- [x] ARIA labels and roles throughout the app
+- [x] Live regions for screen reader announcements
+- [x] Focus management utilities
+- [x] Reduced motion support hook
+- [x] Keyboard navigation helpers
 
-**Testing Tools**:
-- axe-core for automated testing
-- VoiceOver/NVDA manual testing
-- Lighthouse accessibility audit
+See `src/lib/accessibility.ts` and `src/components/AccessibilityComponents.tsx`.
+
+**Future extensions**:
+- [ ] Automated axe-core testing in CI
+- [ ] Full WCAG 2.1 AA audit
+- [ ] Color contrast verification
 
 **Files to audit**:
 - All components in `src/components/`

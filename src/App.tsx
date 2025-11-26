@@ -33,6 +33,8 @@ import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
 import { AISuggestionCard } from '@/components/AISuggestionCard'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { SkipLink, LiveRegion } from '@/components/AccessibilityComponents'
+import { SettingsHistoryTimeline } from '@/components/SettingsHistoryTimeline'
 
 // Lazy load heavy components for code splitting
 const BatchConversion = lazy(() => import('@/components/BatchConversion').then(m => ({ default: m.BatchConversion })))
@@ -44,8 +46,9 @@ const IterativeConverter = lazy(() => import('@/components/IterativeConverter').
 // Loading fallback component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center p-8">
+    <div className="flex items-center justify-center p-8" role="status" aria-label="Loading">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <span className="sr-only">Loading...</span>
     </div>
   )
 }
@@ -58,6 +61,7 @@ function App() {
   const [dividerPosition, setDividerPosition] = useState(50)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [isBatchMode, setIsBatchMode] = useState(false)
+  const [showSettingsHistory, setShowSettingsHistory] = useState(false)
   const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -363,11 +367,30 @@ function App() {
     return cleanup
   }, [])
 
+  // Handle restoring settings from history
+  const handleRestoreSettings = useCallback((index: number) => {
+    if (settingsHistory[index]) {
+      updateSettings(settingsHistory[index].settings)
+      toast.info('Settings restored', {
+        description: `Restored settings from ${new Date(settingsHistory[index].timestamp).toLocaleTimeString()}`,
+      })
+    }
+  }, [settingsHistory, updateSettings])
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to main content link for keyboard users */}
+      <SkipLink targetId="main-content" />
+      
+      {/* Live region for screen reader announcements */}
+      <LiveRegion>
+        {isProcessing ? 'Converting image...' : ''}
+        {currentJob?.status === 'completed' ? 'Conversion complete' : ''}
+      </LiveRegion>
+      
       <ConnectionStatus isOnline={isOnline} />
       
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-border bg-card" role="banner">
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -376,6 +399,10 @@ function App() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('converter')}
+                role="button"
+                tabIndex={0}
+                aria-label="Go to home"
+                onKeyDown={(e) => e.key === 'Enter' && setCurrentPage('converter')}
               >
                 <Sparkle className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" weight="fill" />
               </motion.div>
@@ -395,6 +422,7 @@ function App() {
                 variant={currentPage === 'formats' ? 'default' : 'outline'}
                 onClick={() => setCurrentPage(currentPage === 'converter' ? 'formats' : 'converter')}
                 className="gap-2"
+                aria-label={currentPage === 'formats' ? 'Go back to converter' : 'Open format guide'}
               >
                 {currentPage === 'formats' ? (
                   <>
@@ -413,7 +441,7 @@ function App() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
+      <main id="main-content" className="container mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8" role="main" tabIndex={-1}>
         {currentPage === 'formats' ? (
           <Suspense fallback={<LoadingFallback />}>
             <FormatGuide />
@@ -427,6 +455,7 @@ function App() {
               multiple
               className="hidden"
               onChange={(e) => handleSingleFileSelect(e.target.files)}
+              aria-label="Select image file to convert"
             />
 
             <Tabs defaultValue="convert" className="w-full">
@@ -506,6 +535,15 @@ function App() {
                   isAIOptimizing={isAnalyzing}
                 />
                 <SettingsInfoCard />
+                
+                {/* Settings History Timeline */}
+                {settingsHistory.length > 0 && (
+                  <SettingsHistoryTimeline
+                    history={settingsHistory}
+                    currentIndex={settingsHistoryIndex}
+                    onRestore={handleRestoreSettings}
+                  />
+                )}
               </div>
             </div>
           </TabsContent>
