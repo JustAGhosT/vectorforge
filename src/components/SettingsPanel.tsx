@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning } from '@phosphor-icons/react'
+import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning, Robot } from '@phosphor-icons/react'
 import { ConversionSettings } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { PresetSelector } from '@/components/PresetSelector'
@@ -24,6 +24,8 @@ interface SettingsPanelProps {
   onRedo: () => void
   onAIOptimize?: () => void
   isAIOptimizing?: boolean
+  enableAIIterative?: boolean
+  onEnableAIIterativeChange?: (enabled: boolean) => void
 }
 
 export function SettingsPanel({
@@ -39,6 +41,8 @@ export function SettingsPanel({
   onRedo,
   onAIOptimize,
   isAIOptimizing = false,
+  enableAIIterative = false,
+  onEnableAIIterativeChange,
 }: SettingsPanelProps) {
   const isMobile = useIsMobile()
 
@@ -152,6 +156,27 @@ export function SettingsPanel({
           Professional-grade tracing with WASM acceleration
         </p>
       </div>
+
+      {onEnableAIIterativeChange && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Robot weight="fill" className="w-4 h-4 text-purple-500" />
+                <label className="text-sm font-medium">AI Iterative Refinement</label>
+              </div>
+              <Switch
+                checked={enableAIIterative}
+                onCheckedChange={onEnableAIIterativeChange}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use AI to automatically improve conversion quality through multiple iterations
+            </p>
+          </div>
+        </>
+      )}
 
       {canReconvert && onReconvert && (
         <>
