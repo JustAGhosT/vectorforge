@@ -1,0 +1,378 @@
+// Image Conversion Web Worker
+// Handles heavy image processing off the main thread
+
+import type { ConversionSettings } from './converter'
+
+// Types for worker communication
+export interface WorkerMessage {
+  type: 'convert'
+  imageData: ImageData
+  settings: ConversionSettings
+  id: string
+}
+
+export interface WorkerResponse {
+  type: 'success' | 'error' | 'progress'
+  id: string
+  svg?: string
+  progress?: number
+  error?: string
+}
+
+// Color quantization using median-cut algorithm
+function quantizeColors(data: Uint8ClampedArray, levels: number): Uint8ClampedArray {
+  const quantized = new Uint8ClampedArray(data.length)
+  const step = Math.max(1, Math.floor(256 / levels))
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    
+    if (a < 10) {
+      quantized[i] = quantized[i + 1] = quantized[i + 2] = 255
+      quantized[i + 3] = 0
+      continue
+    }
+
+    quantized[i] = Math.round(data[i] / step) * step
+    quantized[i + 1] = Math.round(data[i + 1] / step) * step
+    quantized[i + 2] = Math.round(data[i + 2] / step) * step
+    quantized[i + 3] = 255
+  }
+
+  return quantized
+}
+
+interface ColorLayer {
+  color: string
+  pixels: boolean[]
+}
+
+function extractColorLayers(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number
+): ColorLayer[] {
+  const colorMap = new Map<string, number>()
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    if (a < 10) continue
+
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    const color = `rgb(${r},${g},${b})`
+    
+    colorMap.set(color, (colorMap.get(color) || 0) + 1)
+  }
+
+  const sortedColors = Array.from(colorMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([color]) => color)
+
+  return sortedColors.map(color => {
+    const [r, g, b] = color.match(/\d+/g)!.map(Number)
+    const pixels: boolean[] = []
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelR = data[i]
+      const pixelG = data[i + 1]
+      const pixelB = data[i + 2]
+      const pixelA = data[i + 3]
+
+      pixels.push(
+        pixelA >= 10 && 
+        pixelR === r && 
+        pixelG === g && 
+        pixelB === b
+      )
+    }
+
+    return { color, pixels }
+  })
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+function traceContours(
+  pixels: boolean[],
+  width: number,
+  height: number,
+  minSize: number
+): Point[][] {
+  const visited = new Array(pixels.length).fill(false)
+  const contours: Point[][] = []
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      
+      if (pixels[idx] && !visited[idx]) {
+        const contour = marchingSquares(pixels, visited, width, height, x, y)
+        
+        if (contour.length >= minSize) {
+          contours.push(contour)
+        }
+      }
+    }
+  }
+
+  return contours
+}
+
+function marchingSquares(
+  pixels: boolean[],
+  visited: boolean[],
+  width: number,
+  height: number,
+  startX: number,
+  startY: number
+): Point[] {
+  const contour: Point[] = []
+  const queue: Point[] = [{ x: startX, y: startY }]
+
+  while (queue.length > 0) {
+    const { x, y } = queue.shift()!
+    const idx = y * width + x
+
+    if (x < 0 || x >= width || y < 0 || y >= height) continue
+    if (visited[idx] || !pixels[idx]) continue
+
+    visited[idx] = true
+
+    const isEdge = 
+      x === 0 || x === width - 1 || 
+      y === 0 || y === height - 1 ||
+      !pixels[idx - 1] ||
+      !pixels[idx + 1] ||
+      !pixels[idx - width] ||
+      !pixels[idx + width]
+
+    if (isEdge) {
+      contour.push({ x, y })
+    }
+
+    queue.push(
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 }
+    )
+  }
+
+  return simplifyContour(contour, 1.5)
+}
+
+function simplifyContour(points: Point[], tolerance: number): Point[] {
+  if (points.length < 3) return points
+
+  const douglasPeucker = (pts: Point[], eps: number): Point[] => {
+    if (pts.length < 3) return pts
+
+    let maxDist = 0
+    let maxIndex = 0
+    const first = pts[0]
+    const last = pts[pts.length - 1]
+
+    for (let i = 1; i < pts.length - 1; i++) {
+      const dist = perpendicularDistance(pts[i], first, last)
+      if (dist > maxDist) {
+        maxDist = dist
+        maxIndex = i
+      }
+    }
+
+    if (maxDist > eps) {
+      const left = douglasPeucker(pts.slice(0, maxIndex + 1), eps)
+      const right = douglasPeucker(pts.slice(maxIndex), eps)
+      return left.slice(0, -1).concat(right)
+    }
+
+    return [first, last]
+  }
+
+  return douglasPeucker(points, tolerance)
+}
+
+function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+  const dx = lineEnd.x - lineStart.x
+  const dy = lineEnd.y - lineStart.y
+
+  if (dx === 0 && dy === 0) {
+    return Math.sqrt(
+      Math.pow(point.x - lineStart.x, 2) + 
+      Math.pow(point.y - lineStart.y, 2)
+    )
+  }
+
+  const t = Math.max(0, Math.min(1,
+    ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy)
+  ))
+
+  const projX = lineStart.x + t * dx
+  const projY = lineStart.y + t * dy
+
+  return Math.sqrt(
+    Math.pow(point.x - projX, 2) + 
+    Math.pow(point.y - projY, 2)
+  )
+}
+
+function applyCatmullRomSpline(points: Point[], tension: number): Point[] {
+  if (points.length < 4) return points
+
+  const result: Point[] = []
+  const alpha = Math.min(0.5, tension)
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(points.length - 1, i + 2)]
+
+    const segments = 5
+    for (let t = 0; t < segments; t++) {
+      const tt = t / segments
+
+      const t2 = tt * tt
+      const t3 = t2 * tt
+
+      const x = 0.5 * (
+        2 * p1.x +
+        (-p0.x + p2.x) * tt +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+      )
+
+      const y = 0.5 * (
+        2 * p1.y +
+        (-p0.y + p2.y) * tt +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+      )
+
+      result.push({ 
+        x: p1.x * (1 - alpha) + x * alpha, 
+        y: p1.y * (1 - alpha) + y * alpha 
+      })
+    }
+  }
+
+  result.push(points[points.length - 1])
+  return result
+}
+
+function contourToPath(points: Point[], smoothness: number): string {
+  if (points.length < 2) return ''
+
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+
+  if (smoothness > 0.5 && points.length >= 3) {
+    for (let i = 1; i < points.length; i++) {
+      const curr = points[i]
+      const prev = points[i - 1]
+      const next = points[(i + 1) % points.length]
+
+      const cp1x = prev.x + (curr.x - prev.x) * 0.5
+      const cp1y = prev.y + (curr.y - prev.y) * 0.5
+      const cp2x = curr.x - (next.x - curr.x) * 0.25
+      const cp2y = curr.y - (next.y - curr.y) * 0.25
+
+      path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`
+    }
+  } else {
+    for (let i = 1; i < points.length; i++) {
+      path += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`
+    }
+  }
+
+  path += ' Z'
+  return path
+}
+
+function generateSvgFromImageData(
+  imageData: ImageData,
+  settings: ConversionSettings,
+  onProgress?: (progress: number) => void
+): string {
+  const { width, height, data } = imageData
+  const { complexity, colorSimplification, pathSmoothing } = settings
+
+  const colorCount = Math.max(4, Math.floor(256 - (colorSimplification * 240)))
+  const detailThreshold = Math.max(2, Math.floor(50 - (complexity * 45)))
+  const smoothness = pathSmoothing
+
+  onProgress?.(10)
+
+  const quantizedData = quantizeColors(data, colorCount)
+  onProgress?.(30)
+
+  const colorLayers = extractColorLayers(quantizedData, width, height)
+  onProgress?.(50)
+
+  const paths: string[] = []
+  const totalLayers = colorLayers.length
+
+  colorLayers.forEach(({ color, pixels }, index) => {
+    const contours = traceContours(pixels, width, height, detailThreshold)
+    
+    contours.forEach(contour => {
+      if (contour.length < 3) return
+      
+      const smoothedContour = smoothness > 0.3 
+        ? applyCatmullRomSpline(contour, smoothness)
+        : contour
+      
+      const pathData = contourToPath(smoothedContour, smoothness)
+      if (pathData) {
+        paths.push(`<path d="${pathData}" fill="${color}" />`)
+      }
+    })
+
+    onProgress?.(50 + Math.floor((index / totalLayers) * 40))
+  })
+
+  onProgress?.(95)
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  ${paths.join('\n  ')}
+</svg>`
+}
+
+// Worker message handler
+self.onmessage = function(e: MessageEvent<WorkerMessage>) {
+  const { type, imageData, settings, id } = e.data
+
+  if (type === 'convert') {
+    try {
+      const svg = generateSvgFromImageData(imageData, settings, (progress) => {
+        const response: WorkerResponse = {
+          type: 'progress',
+          id,
+          progress
+        }
+        self.postMessage(response)
+      })
+
+      const response: WorkerResponse = {
+        type: 'success',
+        id,
+        svg
+      }
+      self.postMessage(response)
+    } catch (error) {
+      const response: WorkerResponse = {
+        type: 'error',
+        id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+      self.postMessage(response)
+    }
+  }
+}
+
+export {}

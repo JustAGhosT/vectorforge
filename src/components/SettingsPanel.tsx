@@ -2,15 +2,19 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SlidersHorizontal, ArrowCounterClockwise, Sparkle } from '@phosphor-icons/react'
+import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning } from '@phosphor-icons/react'
 import { ConversionSettings } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { PresetSelector } from '@/components/PresetSelector'
+import type { ConversionPreset } from '@/lib/presets'
 
 interface SettingsPanelProps {
   settings: ConversionSettings
-  onSettingChange: (key: keyof ConversionSettings, value: number) => void
+  onSettingChange: (key: keyof ConversionSettings, value: number | boolean) => void
+  onApplyPreset?: (preset: ConversionPreset) => void
   onReconvert?: () => void
   canReconvert: boolean
   isProcessing: boolean
@@ -25,6 +29,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({
   settings,
   onSettingChange,
+  onApplyPreset,
   onReconvert,
   canReconvert,
   isProcessing,
@@ -39,6 +44,18 @@ export function SettingsPanel({
 
   const SettingsContent = () => (
     <div className="space-y-6">
+      {/* Quick Presets */}
+      {onApplyPreset && (
+        <>
+          <PresetSelector
+            settings={settings}
+            onApplyPreset={onApplyPreset}
+            disabled={isProcessing}
+          />
+          <Separator />
+        </>
+      )}
+      
       {onAIOptimize && canReconvert && (
         <>
           <Button
@@ -115,6 +132,24 @@ export function SettingsPanel({
         />
         <p className="text-xs text-muted-foreground">
           Smooth edges for cleaner appearance
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Lightning weight="fill" className="w-4 h-4 text-orange" />
+            <label className="text-sm font-medium">Potrace Engine</label>
+          </div>
+          <Switch
+            checked={settings.usePotrace ?? false}
+            onCheckedChange={(checked) => onSettingChange('usePotrace', checked)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Professional-grade tracing with WASM acceleration
         </p>
       </div>
 

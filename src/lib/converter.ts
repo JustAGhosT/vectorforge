@@ -2,6 +2,7 @@ export interface ConversionSettings {
   complexity: number
   colorSimplification: number
   pathSmoothing: number
+  usePotrace?: boolean // Use professional Potrace algorithm (WASM-accelerated)
 }
 
 export interface ConversionJob {
@@ -32,7 +33,7 @@ export async function convertImageToSvg(
       try {
         const img = new Image()
         
-        img.onload = () => {
+        img.onload = async () => {
           try {
             if (!img.width || !img.height) {
               clearTimeout(timeoutId)
@@ -61,7 +62,21 @@ export async function convertImageToSvg(
             ctx.drawImage(img, 0, 0)
 
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-            const svg = generateSvgFromImageData(imageData, settings)
+            
+            let svg: string
+            
+            // Use Potrace if enabled, fallback to basic converter
+            if (settings.usePotrace) {
+              try {
+                const { convertWithPotraceMultiColor } = await import('./potrace-converter')
+                svg = await convertWithPotraceMultiColor(imageData, settings)
+              } catch (potraceError) {
+                console.warn('Potrace failed, falling back to basic converter:', potraceError)
+                svg = generateSvgFromImageData(imageData, settings)
+              }
+            } else {
+              svg = generateSvgFromImageData(imageData, settings)
+            }
             
             if (!svg || svg.length === 0) {
               clearTimeout(timeoutId)

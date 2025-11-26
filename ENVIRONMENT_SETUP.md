@@ -6,55 +6,54 @@ This document outlines the required GitHub secrets and environment variables nee
 
 VectorForge uses AI-powered image analysis to provide intelligent SVG conversion recommendations. To enable this functionality, you need to configure the following GitHub secrets:
 
-### OpenAI API Configuration
-
-The application uses OpenAI's GPT-4o model through the Spark LLM API for intelligent image analysis and optimization suggestions.
-
-#### Required Secrets
+### Deployment (Netlify)
 
 | Secret Name | Description | How to Obtain |
 |------------|-------------|---------------|
-| `OPENAI_API_KEY` | Your OpenAI API key for GPT-4o access | 1. Go to [platform.openai.com](https://platform.openai.com)<br>2. Navigate to API Keys section<br>3. Create a new secret key<br>4. Copy the key immediately (it won't be shown again) |
+| `NETLIFY_AUTH_TOKEN` | Netlify personal access token | 1. Go to [app.netlify.com](https://app.netlify.com)<br>2. User Settings → Applications → Personal access tokens<br>3. Generate new token |
+| `NETLIFY_SITE_ID` | Your Netlify site ID | Found in Site settings → General → Site details |
 
-#### Setting Up GitHub Secrets
+### Azure AI Configuration (Recommended)
 
-1. Navigate to your GitHub repository
-2. Go to **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Add the following secret:
-   - **Name**: `OPENAI_API_KEY`
-   - **Value**: Your OpenAI API key (starts with `sk-`)
-5. Click **Add secret**
-
-## Alternative: Azure AI Foundry Configuration
-
-If you're using Azure AI Foundry instead of OpenAI directly, configure these secrets:
+The application uses Azure AI for intelligent image analysis and optimization suggestions.
 
 | Secret Name | Description | How to Obtain |
 |------------|-------------|---------------|
-| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI endpoint URL | Available in Azure Portal under your Azure OpenAI resource |
-| `AZURE_OPENAI_API_KEY` | Your Azure OpenAI API key | Found in Azure Portal under Keys and Endpoint section |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | Deployment name for GPT-4o | The name you assigned when deploying the model |
+| `AZURE_AI_ENDPOINT` | Your Azure AI endpoint URL | Available in Azure Portal under your Azure AI resource |
+| `AZURE_SECRET_KEY` | Your Azure AI API key | Found in Azure Portal under Keys and Endpoint section |
+| `AZURE_MODEL_NAME` | Model deployment name (e.g., `gpt-4o`) | The name you assigned when deploying the model |
 
-### Setting Up Azure AI Foundry
+#### Setting Up Azure AI
 
 1. Create an Azure OpenAI resource in the [Azure Portal](https://portal.azure.com)
-2. Deploy the GPT-4o model
+2. Deploy the GPT-4o model (or your preferred model)
 3. Copy your endpoint URL and API key
-4. Add these as GitHub secrets following the same process above
+4. Add these as GitHub secrets:
+   - Go to your GitHub repository
+   - Navigate to **Settings** → **Secrets and variables** → **Actions**
+   - Click **New repository secret**
+   - Add each secret with the exact names above
+
+### Alternative: OpenAI Configuration
+
+If you prefer using OpenAI directly instead of Azure:
+
+| Secret Name | Description | How to Obtain |
+|------------|-------------|---------------|
+| `OPENAI_API_KEY` | Your OpenAI API key for GPT-4o access | 1. Go to [platform.openai.com](https://platform.openai.com)<br>2. Navigate to API Keys section<br>3. Create a new secret key |
 
 ## Environment Variables (Local Development)
 
 For local development, create a `.env` file in the project root:
 
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=sk-your-api-key-here
+# Azure AI Configuration (Recommended)
+VITE_AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
+VITE_AZURE_SECRET_KEY=your-azure-key-here
+VITE_AZURE_MODEL_NAME=gpt-4o
 
-# OR for Azure AI Foundry
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-azure-key-here
-AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
+# OR for OpenAI directly
+# OPENAI_API_KEY=sk-your-api-key-here
 ```
 
 > **⚠️ Important**: Never commit your `.env` file to version control. It's already included in `.gitignore`.
