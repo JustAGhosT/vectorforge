@@ -14,6 +14,7 @@ import {
   BookOpen,
   ArrowLeft,
   Robot,
+  WarningCircle,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
@@ -26,6 +27,7 @@ import { useBatchConversion } from '@/hooks/use-batch-conversion'
 import { useSettingsHistory } from '@/hooks/use-settings-history'
 import { useAIOptimizer } from '@/hooks/use-ai-optimizer'
 import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
+import { useErrorStore } from '@/hooks/use-error-store'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
@@ -35,6 +37,7 @@ import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { SkipLink, LiveRegion } from '@/components/AccessibilityComponents'
 import { SettingsHistoryTimeline } from '@/components/SettingsHistoryTimeline'
+import { ErrorLogDialog } from '@/components/ErrorLogDialog'
 
 // Lazy load heavy components for code splitting
 const BatchConversion = lazy(() => import('@/components/BatchConversion').then(m => ({ default: m.BatchConversion })))
@@ -64,7 +67,11 @@ function App() {
   const [showSettingsHistory, setShowSettingsHistory] = useState(false)
   const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [enableAIIterative, setEnableAIIterative] = useState(false)
+  const [showErrorLog, setShowErrorLog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { errors, addError, removeError, clearErrors, hasErrors, errorCount } = useErrorStore()
 
   const {
     settings,
@@ -88,6 +95,7 @@ function App() {
     handleFileSelect,
     handleReconvert,
     setCurrentJob,
+    clearJob,
   } = useConversion(settings)
 
   const {
@@ -129,7 +137,7 @@ function App() {
   const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault()
       setIsDragging(false)
 
@@ -145,17 +153,53 @@ function App() {
       }
 
       if (files.length === 1) {
-        handleFileSelect(files[0]).then((job) => {
-          if (job) {
-            setHistory((current) => [job, ...(current || [])].slice(0, 20))
+        // Clear previous job before processing new file
+        clearJob()
+        const job = await handleFileSelect(files[0])
+        if (job) {
+          setHistory((current) => [job, ...(current || [])].slice(0, 20))
+          
+          // If AI Iterative is enabled, run iterative conversion after initial conversion
+          if (enableAIIterative && job.status === 'completed') {
+            toast.info('Starting AI Iterative Refinement...', {
+              description: 'Automatically improving conversion quality',
+            })
+            
+            try {
+              const result = await handleIterativeConversion(files[0], settings)
+              if (result) {
+                setCurrentJob(result.job)
+                updateSettings(result.settingsUsed)
+                setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+                
+                toast.success('AI Iterative Refinement Complete!', {
+                  description: `Best result: ${result.likenessScore}% likeness`,
+                })
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
+              addError({
+                message: 'AI Iterative Refinement Failed',
+                source: 'ai',
+                details: errorMessage,
+              })
+              toast.error('AI Iterative Refinement Failed', {
+                description: errorMessage,
+                duration: Infinity,
+                action: {
+                  label: 'View Details',
+                  onClick: () => setShowErrorLog(true),
+                },
+              })
+            }
           }
-        })
+        }
       } else {
         handleBatchFilesSelect(files as unknown as FileList)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -235,11 +279,26 @@ function App() {
         description: `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`,
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Could not analyze image'
+      
+      // Add to error store for persistent tracking
+      addError({
+        message: 'AI Analysis Failed',
+        source: 'ai',
+        details: errorMessage,
+      })
+      
+      // Show persistent toast with option to view details
       toast.error('AI Analysis Failed', {
-        description: error instanceof Error ? error.message : 'Could not analyze image',
+        description: errorMessage,
+        duration: Infinity,
+        action: {
+          label: 'View Details',
+          onClick: () => setShowErrorLog(true),
+        },
       })
     }
-  }, [currentJob, settings, analyzeImage, clearSuggestion])
+  }, [currentJob, settings, analyzeImage, clearSuggestion, addError])
 
   const handleApplyAISuggestion = useCallback(
     async (suggestedSettings: { complexity: number; colorSimplification: number; pathSmoothing: number }) => {
@@ -292,16 +351,53 @@ function App() {
       if (!files || files.length === 0) return
 
       if (files.length === 1) {
+        // Clear previous job before processing new file
+        clearJob()
         const job = await handleFileSelect(files[0])
         if (job) {
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
+          
+          // If AI Iterative is enabled, run iterative conversion after initial conversion
+          if (enableAIIterative && job.status === 'completed') {
+            toast.info('Starting AI Iterative Refinement...', {
+              description: 'Automatically improving conversion quality',
+            })
+            
+            try {
+              const result = await handleIterativeConversion(files[0], settings)
+              if (result) {
+                setCurrentJob(result.job)
+                updateSettings(result.settingsUsed)
+                setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+                
+                toast.success('AI Iterative Refinement Complete!', {
+                  description: `Best result: ${result.likenessScore}% likeness`,
+                })
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
+              addError({
+                message: 'AI Iterative Refinement Failed',
+                source: 'ai',
+                details: errorMessage,
+              })
+              toast.error('AI Iterative Refinement Failed', {
+                description: errorMessage,
+                duration: Infinity,
+                action: {
+                  label: 'View Details',
+                  onClick: () => setShowErrorLog(true),
+                },
+              })
+            }
+          }
         }
       } else {
         handleBatchFilesSelect(files)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {
@@ -533,6 +629,8 @@ function App() {
                   onRedo={redoSettings}
                   onAIOptimize={handleAIOptimize}
                   isAIOptimizing={isAnalyzing}
+                  enableAIIterative={enableAIIterative}
+                  onEnableAIIterativeChange={setEnableAIIterative}
                 />
                 <SettingsInfoCard />
                 
@@ -674,6 +772,15 @@ function App() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-0 text-xs md:text-sm text-muted-foreground">
             <p>© 2024 VectorForge. Professional-quality SVG conversion.</p>
             <div className="flex items-center gap-4">
+              {hasErrors && (
+                <button
+                  onClick={() => setShowErrorLog(true)}
+                  className="flex items-center gap-2 text-destructive hover:text-destructive/80 transition-colors"
+                >
+                  <WarningCircle className="w-4 h-4" weight="bold" />
+                  <span>{errorCount} error{errorCount !== 1 ? 's' : ''}</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowShortcuts(true)}
                 className="flex items-center gap-2 hover:text-foreground transition-colors"
@@ -693,6 +800,14 @@ function App() {
       <KeyboardShortcutsModal
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
+      />
+      
+      <ErrorLogDialog
+        errors={errors}
+        isOpen={showErrorLog}
+        onClose={() => setShowErrorLog(false)}
+        onRemoveError={removeError}
+        onClearAll={clearErrors}
       />
     </div>
   )
