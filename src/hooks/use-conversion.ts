@@ -66,8 +66,20 @@ export function useConversion(settings: ConversionSettings) {
 
         setCurrentJob(job)
 
+        // Provide accurate feedback about the conversion result
+        const sizeRatio = file.size / svgSize
+        let description: string
+        if (sizeRatio > 1) {
+          description = `${Math.round(sizeRatio * 10) / 10}x smaller`
+        } else if (sizeRatio < 1) {
+          const increase = Math.round((svgSize / file.size) * 10) / 10
+          description = `SVG is ${increase}x larger (normal for simple images)`
+        } else {
+          description = 'Similar file size'
+        }
+
         toast.success('Conversion complete!', {
-          description: `${Math.round((file.size / svgSize) * 100) / 100}x smaller`,
+          description,
         })
 
         return job
