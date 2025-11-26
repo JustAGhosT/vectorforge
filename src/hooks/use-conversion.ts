@@ -67,13 +67,13 @@ export function useConversion(settings: ConversionSettings) {
         setCurrentJob(job)
 
         // Provide accurate feedback about the conversion result
+        const roundToOneDecimal = (n: number) => Math.round(n * 10) / 10
         const sizeRatio = file.size / svgSize
         let description: string
         if (sizeRatio > 1) {
-          description = `${Math.round(sizeRatio * 10) / 10}x smaller`
+          description = `${roundToOneDecimal(sizeRatio)}x smaller`
         } else if (sizeRatio < 1) {
-          const increase = Math.round((svgSize / file.size) * 10) / 10
-          description = `SVG is ${increase}x larger (normal for simple images)`
+          description = `SVG is ${roundToOneDecimal(svgSize / file.size)}x larger (normal for simple images)`
         } else {
           description = 'Similar file size'
         }
