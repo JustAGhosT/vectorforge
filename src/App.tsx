@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -28,14 +28,26 @@ import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
-import { BatchConversion } from '@/components/BatchConversion'
-import { ConversionHistory } from '@/components/ConversionHistory'
 import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
-import { FormatGuide } from '@/components/FormatGuide'
-import { MultiFormatConverter } from '@/components/MultiFormatConverter'
 import { AISuggestionCard } from '@/components/AISuggestionCard'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
-import { IterativeConverter } from '@/components/IterativeConverter'
+import { ThemeToggle } from '@/components/ThemeToggle'
+
+// Lazy load heavy components for code splitting
+const BatchConversion = lazy(() => import('@/components/BatchConversion').then(m => ({ default: m.BatchConversion })))
+const ConversionHistory = lazy(() => import('@/components/ConversionHistory').then(m => ({ default: m.ConversionHistory })))
+const FormatGuide = lazy(() => import('@/components/FormatGuide').then(m => ({ default: m.FormatGuide })))
+const MultiFormatConverter = lazy(() => import('@/components/MultiFormatConverter').then(m => ({ default: m.MultiFormatConverter })))
+const IterativeConverter = lazy(() => import('@/components/IterativeConverter').then(m => ({ default: m.IterativeConverter })))
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center p-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  )
+}
 
 function App() {
   const isMobile = useIsMobile()
@@ -350,30 +362,35 @@ function App() {
               </div>
             </div>
             
-            <Button
-              variant={currentPage === 'formats' ? 'default' : 'outline'}
-              onClick={() => setCurrentPage(currentPage === 'converter' ? 'formats' : 'converter')}
-              className="gap-2"
-            >
-              {currentPage === 'formats' ? (
-                <>
-                  <ArrowLeft className="w-4 h-4" weight="bold" />
-                  <span className="hidden sm:inline">Back</span>
-                </>
-              ) : (
-                <>
-                  <BookOpen className="w-4 h-4" weight="bold" />
-                  <span className="hidden sm:inline">Format Guide</span>
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button
+                variant={currentPage === 'formats' ? 'default' : 'outline'}
+                onClick={() => setCurrentPage(currentPage === 'converter' ? 'formats' : 'converter')}
+                className="gap-2"
+              >
+                {currentPage === 'formats' ? (
+                  <>
+                    <ArrowLeft className="w-4 h-4" weight="bold" />
+                    <span className="hidden sm:inline">Back</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="w-4 h-4" weight="bold" />
+                    <span className="hidden sm:inline">Format Guide</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
         {currentPage === 'formats' ? (
-          <FormatGuide />
+          <Suspense fallback={<LoadingFallback />}>
+            <FormatGuide />
+          </Suspense>
         ) : (
           <>
             <input
@@ -494,57 +511,65 @@ function App() {
               </div>
 
               <div className="space-y-4 md:space-y-6">
-                <IterativeConverter
-                  maxIterations={iterativeConfig.maxIterations}
-                  targetLikeness={iterativeConfig.targetLikeness}
-                  onMaxIterationsChange={(value) =>
-                    updateIterativeConfig({ maxIterations: value })
-                  }
-                  onTargetLikenessChange={(value) =>
-                    updateIterativeConfig({ targetLikeness: value })
-                  }
-                  isProcessing={isIterativeProcessing}
-                  currentIteration={currentIteration}
-                  progress={iterativeProgress}
-                  iterations={iterations}
-                  bestIteration={bestIteration}
-                  onStart={handleStartIterativeConversion}
-                  onCancel={cancelIterative}
-                  canStart={!!currentFile}
-                />
+                <Suspense fallback={<LoadingFallback />}>
+                  <IterativeConverter
+                    maxIterations={iterativeConfig.maxIterations}
+                    targetLikeness={iterativeConfig.targetLikeness}
+                    onMaxIterationsChange={(value) =>
+                      updateIterativeConfig({ maxIterations: value })
+                    }
+                    onTargetLikenessChange={(value) =>
+                      updateIterativeConfig({ targetLikeness: value })
+                    }
+                    isProcessing={isIterativeProcessing}
+                    currentIteration={currentIteration}
+                    progress={iterativeProgress}
+                    iterations={iterations}
+                    bestIteration={bestIteration}
+                    onStart={handleStartIterativeConversion}
+                    onCancel={cancelIterative}
+                    canStart={!!currentFile}
+                  />
+                </Suspense>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="batch" className="space-y-4 md:space-y-6">
-            <BatchConversion
-              batchFiles={batchFiles}
-              batchJobs={batchJobs}
-              isProcessing={isBatchProcessing}
-              progress={batchProgress}
-              isDragging={isDragging}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onFileSelect={handleBatchFilesSelect}
-              onRemoveFile={removeBatchFile}
-              onConvert={handleConvertAndSave}
-              onDownload={handleDownload}
-              onDownloadAll={handleDownloadAllBatch}
-              onClear={clearBatch}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <BatchConversion
+                batchFiles={batchFiles}
+                batchJobs={batchJobs}
+                isProcessing={isBatchProcessing}
+                progress={batchProgress}
+                isDragging={isDragging}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onFileSelect={handleBatchFilesSelect}
+                onRemoveFile={removeBatchFile}
+                onConvert={handleConvertAndSave}
+                onDownload={handleDownload}
+                onDownloadAll={handleDownloadAllBatch}
+                onClear={clearBatch}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="formats" className="space-y-4 md:space-y-6">
-            <MultiFormatConverter />
+            <Suspense fallback={<LoadingFallback />}>
+              <MultiFormatConverter />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="history">
-            <ConversionHistory
-              history={history || []}
-              onLoadItem={loadHistoryItem}
-              onDownload={handleDownload}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <ConversionHistory
+                history={history || []}
+                onLoadItem={loadHistoryItem}
+                onDownload={handleDownload}
+              />
+            </Suspense>
           </TabsContent>
         </Tabs>
         </>

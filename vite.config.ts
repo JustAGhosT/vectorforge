@@ -22,4 +22,27 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor chunks
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-radix': [
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-dropdown-menu',
+          ],
+          'vendor-ui': ['framer-motion', 'sonner', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+          'vendor-charts': ['recharts', 'd3'],
+        }
+      }
+    }
+  },
+  worker: {
+    format: 'es'
+  }
 });
