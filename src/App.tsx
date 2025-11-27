@@ -90,12 +90,17 @@ function App() {
   const { history: comparisonHistory, addComparison } = useComparisonHistory()
 
   const { errors, addError, removeError, clearErrors, hasErrors, errorCount } = useErrorStore()
-  const { entries: activityEntries, addEntry: addActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
+  const { entries: activityEntries, addEntry: addActivityEntry, updateEntry: updateActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
 
   // Helper function to add activity log entries
   const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error', details?: Record<string, unknown>) => {
     return addActivityEntry({ title, description, type, status, details })
   }, [addActivityEntry])
+
+  // Helper function to update an existing activity log entry
+  const updateActivity = useCallback((id: string, title: string, description: string, status: 'pending' | 'success' | 'error', details?: Record<string, unknown>) => {
+    updateActivityEntry(id, { title, description, status, details })
+  }, [updateActivityEntry])
 
   const {
     settings,
@@ -171,30 +176,32 @@ function App() {
 
   // Helper function to run AI comparison after conversion
   const runAIComparison = useCallback(async (pngDataUrl: string, svgDataUrl: string, filename?: string, iteration?: number) => {
-    logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
+    const comparisonActivityId = logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
     try {
       const comparisonResult = await analyzeComparison(pngDataUrl, svgDataUrl)
       if (comparisonResult) {
         // Add to comparison history
         addComparison(comparisonResult, filename || 'Unknown', iteration)
         
-        logActivity(
+        updateActivity(
+          comparisonActivityId,
           'AI Comparison complete',
           `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
-          'ai-analysis',
           'success'
         )
         toast.success('AI Comparison Complete', {
           description: `${comparisonResult.similarityScore}% similar with ${comparisonResult.confidence}% confidence`,
         })
+      } else {
+        updateActivity(comparisonActivityId, 'AI Comparison complete', 'No comparison data available', 'success')
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
-      logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error', { stack: error instanceof Error ? error.stack : undefined })
+      updateActivity(comparisonActivityId, 'AI Comparison failed', errorMessage, 'error', { stack: error instanceof Error ? error.stack : undefined })
       // Don't show error toast for comparison - it's an optional feature
       console.error('AI comparison error:', errorMessage)
     }
-  }, [logActivity, analyzeComparison, addComparison])
+  }, [logActivity, updateActivity, analyzeComparison, addComparison])
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -217,9 +224,10 @@ function App() {
         // Clear previous job before processing new file
         clearJob()
         clearComparison()
-        logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
+        const uploadActivityId = logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
+          updateActivity(uploadActivityId, 'Image uploaded', `${files[0].name} processed successfully`, 'success')
           logActivity('Conversion complete', `${files[0].name} converted successfully`, 'conversion', 'success')
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
@@ -228,7 +236,7 @@ function App() {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
-            logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
+            const iterativeActivityId = logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
             
             try {
               const result = await handleIterativeConversion(files[0], settings)
@@ -236,15 +244,17 @@ function App() {
                 setCurrentJob(result.job)
                 updateSettings(result.settingsUsed)
                 setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
-                logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
+                updateActivity(iterativeActivityId, 'AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'success')
                 
                 toast.success('AI Iterative Refinement Complete!', {
                   description: `Best result: ${result.likenessScore}% likeness`,
                 })
+              } else {
+                updateActivity(iterativeActivityId, 'AI Iterative complete', 'No improvement found', 'success')
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
-              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error', { stack: error instanceof Error ? error.stack : undefined })
+              updateActivity(iterativeActivityId, 'AI Iterative failed', errorMessage, 'error', { stack: error instanceof Error ? error.stack : undefined })
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
@@ -263,14 +273,16 @@ function App() {
             // Auto-run AI comparison after successful conversion
             await runAIComparison(job.pngDataUrl, job.svgDataUrl, files[0].name)
           }
+        } else {
+          updateActivity(uploadActivityId, 'Image upload failed', `Failed to process ${files[0].name}`, 'error')
         }
       } else {
-        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'pending')
+        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'success')
         handleBatchFilesSelect(files as unknown as FileList)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, updateActivity, runAIComparison]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -331,13 +343,15 @@ function App() {
   }, [handleBatchConvert, setHistory])
 
   const handleReconvertAndSave = useCallback(async () => {
-    logActivity('Reconverting', 'Applying new settings', 'conversion', 'pending')
+    const reconvertActivityId = logActivity('Reconverting', 'Applying new settings', 'conversion', 'pending')
     const job = await handleReconvert()
     if (job) {
-      logActivity('Reconversion complete', 'Settings applied successfully', 'conversion', 'success')
+      updateActivity(reconvertActivityId, 'Reconversion complete', 'Settings applied successfully', 'success')
       setHistory((current) => [job, ...(current || [])].slice(0, 20))
+    } else {
+      updateActivity(reconvertActivityId, 'Reconversion failed', 'Could not apply settings', 'error')
     }
-  }, [handleReconvert, setHistory, logActivity])
+  }, [handleReconvert, setHistory, logActivity, updateActivity])
 
   const handleAIOptimize = useCallback(async () => {
     if (!currentJob) {
@@ -347,9 +361,9 @@ function App() {
 
     try {
       clearSuggestion()
-      logActivity('AI Analysis started', 'Analyzing image characteristics...', 'ai-analysis', 'pending')
+      const analyzeActivityId = logActivity('AI Analysis started', 'Analyzing image characteristics...', 'ai-analysis', 'pending')
       const aiSuggestion = await analyzeImage(currentJob.pngDataUrl, settings)
-      logActivity('AI Analysis complete', `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`, 'ai-analysis', 'success')
+      updateActivity(analyzeActivityId, 'AI Analysis complete', `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`, 'success')
       
       toast.success('AI Analysis Complete', {
         description: `Detected as ${aiSuggestion.imageType} with ${aiSuggestion.estimatedQuality} quality potential`,
@@ -375,12 +389,12 @@ function App() {
         },
       })
     }
-  }, [currentJob, settings, analyzeImage, clearSuggestion, addError, logActivity])
+  }, [currentJob, settings, analyzeImage, clearSuggestion, addError, logActivity, updateActivity])
 
   const handleApplyAISuggestion = useCallback(
     async (suggestedSettings: { complexity: number; colorSimplification: number; pathSmoothing: number }) => {
       updateSettings(suggestedSettings)
-      logActivity('AI suggestion applied', 'Applying recommended settings', 'ai-suggestion', 'pending')
+      const suggestionActivityId = logActivity('AI suggestion applied', 'Applying recommended settings', 'ai-suggestion', 'pending')
       
       toast.info('Applying AI suggestions...', {
         description: 'Reconverting with optimal settings',
@@ -390,13 +404,15 @@ function App() {
         const job = await handleReconvert()
         if (job) {
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
-          logActivity('AI optimization complete', 'Conversion updated with AI settings', 'ai-suggestion', 'success')
+          updateActivity(suggestionActivityId, 'AI optimization complete', 'Conversion updated with AI settings', 'success')
           toast.success('AI optimization applied successfully!')
+        } else {
+          updateActivity(suggestionActivityId, 'AI optimization failed', 'Could not apply AI settings', 'error')
         }
         clearSuggestion()
       }, 100)
     },
-    [updateSettings, handleReconvert, setHistory, clearSuggestion, logActivity]
+    [updateSettings, handleReconvert, setHistory, clearSuggestion, logActivity, updateActivity]
   )
 
   // Handle SVG modifications from AI Chat
@@ -453,9 +469,10 @@ function App() {
         // Clear previous job before processing new file
         clearJob()
         clearComparison()
-        logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
+        const uploadActivityId = logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
+          updateActivity(uploadActivityId, 'Image uploaded', `${files[0].name} processed successfully`, 'success')
           logActivity('Conversion complete', `${files[0].name} converted successfully`, 'conversion', 'success')
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
@@ -464,7 +481,7 @@ function App() {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
-            logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
+            const iterativeActivityId = logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
             
             try {
               const result = await handleIterativeConversion(files[0], settings)
@@ -472,15 +489,17 @@ function App() {
                 setCurrentJob(result.job)
                 updateSettings(result.settingsUsed)
                 setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
-                logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
+                updateActivity(iterativeActivityId, 'AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'success')
                 
                 toast.success('AI Iterative Refinement Complete!', {
                   description: `Best result: ${result.likenessScore}% likeness`,
                 })
+              } else {
+                updateActivity(iterativeActivityId, 'AI Iterative complete', 'No improvement found', 'success')
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
-              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error', { stack: error instanceof Error ? error.stack : undefined })
+              updateActivity(iterativeActivityId, 'AI Iterative failed', errorMessage, 'error', { stack: error instanceof Error ? error.stack : undefined })
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
@@ -499,14 +518,16 @@ function App() {
             // Auto-run AI comparison after successful conversion
             await runAIComparison(job.pngDataUrl, job.svgDataUrl, files[0].name)
           }
+        } else {
+          updateActivity(uploadActivityId, 'Image upload failed', `Failed to process ${files[0].name}`, 'error')
         }
       } else {
-        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'pending')
+        logActivity('Batch upload', `${files.length} files selected for batch processing`, 'upload', 'success')
         handleBatchFilesSelect(files)
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, updateActivity, runAIComparison]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {
@@ -518,7 +539,7 @@ function App() {
     }
 
     clearComparison()
-    logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
+    const iterativeActivityId = logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
     
     const result = await handleIterativeConversion(currentFile, settings)
     
@@ -526,13 +547,15 @@ function App() {
       setCurrentJob(result.job)
       updateSettings(result.settingsUsed)
       setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
-      logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
+      updateActivity(iterativeActivityId, 'AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'success')
       
       toast.success('Iterative conversion complete!', {
         description: `Best result: ${result.likenessScore}% likeness`,
       })
+    } else {
+      updateActivity(iterativeActivityId, 'AI Iterative complete', 'No improvement found', 'success')
     }
-  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity])
+  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity, updateActivity])
 
   // Handler for one-click AI refinement from comparison card
   const handleRefineWithAI = useCallback(async () => {
@@ -547,7 +570,7 @@ function App() {
     toast.info('Starting AI Refinement...', {
       description: 'Automatically improving conversion quality based on comparison',
     })
-    logActivity('AI Refinement started', 'Using comparison feedback to improve conversion', 'ai-iteration', 'pending')
+    const refinementActivityId = logActivity('AI Refinement started', 'Using comparison feedback to improve conversion', 'ai-iteration', 'pending')
     
     const result = await handleIterativeConversion(currentFile, settings)
     
@@ -555,13 +578,15 @@ function App() {
       setCurrentJob(result.job)
       updateSettings(result.settingsUsed)
       setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
-      logActivity('AI Refinement complete', `Improved to ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
+      updateActivity(refinementActivityId, 'AI Refinement complete', `Improved to ${result.likenessScore}% likeness`, 'success')
       
       toast.success('AI Refinement Complete!', {
         description: `Best result: ${result.likenessScore}% likeness`,
       })
+    } else {
+      updateActivity(refinementActivityId, 'AI Refinement complete', 'No improvement found', 'success')
     }
-  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity])
+  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity, updateActivity])
 
   useKeyboardShortcuts(
     {
