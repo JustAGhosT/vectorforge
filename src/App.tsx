@@ -88,8 +88,8 @@ function App() {
   const { entries: activityEntries, addEntry: addActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
 
   // Helper function to add activity log entries
-  const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error') => {
-    return addActivityEntry({ title, description, type, status })
+  const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error', details?: Record<string, unknown>) => {
+    return addActivityEntry({ title, description, type, status, details })
   }, [addActivityEntry])
 
   const {
@@ -180,7 +180,7 @@ function App() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
-      logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error')
+      logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       // Don't show error toast for comparison - it's an optional feature
       console.error('AI comparison error:', errorMessage)
     }
@@ -199,7 +199,7 @@ function App() {
         toast.error('No image files found', {
           description: 'Please drop image files (PNG, JPG, WebP)',
         })
-        logActivity('Invalid file drop', 'No valid image files were found', 'error', 'error')
+        logActivity('Invalid file drop', 'No valid image files were found', 'error', 'error', { reason: 'No valid image files in drop' })
         return
       }
 
@@ -234,7 +234,7 @@ function App() {
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
-              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error')
+              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined })
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
@@ -346,7 +346,7 @@ function App() {
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Could not analyze image'
-      logActivity('AI Analysis failed', errorMessage, 'ai-analysis', 'error')
+      logActivity('AI Analysis failed', errorMessage, 'ai-analysis', 'error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       
       // Add to error store for persistent tracking
       addError({
@@ -470,7 +470,7 @@ function App() {
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'AI Iterative conversion failed'
-              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error')
+              logActivity('AI Iterative failed', errorMessage, 'ai-iteration', 'error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined })
               addError({
                 message: 'AI Iterative Refinement Failed',
                 source: 'ai',
