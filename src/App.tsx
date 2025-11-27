@@ -33,11 +33,13 @@ import { useAIOptimizer } from '@/hooks/use-ai-optimizer'
 import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
 import { useErrorStore } from '@/hooks/use-error-store'
 import { useActivityLog } from '@/hooks/use-activity-log'
+import { useAIComparison } from '@/hooks/use-ai-comparison'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
 import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal'
 import { AISuggestionCard } from '@/components/AISuggestionCard'
+import { ComparisonCard } from '@/components/ComparisonCard'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { SkipLink, LiveRegion } from '@/components/AccessibilityComponents'
@@ -151,7 +153,38 @@ function App() {
     targetLikeness: 80,
   })
 
-  const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing
+  const {
+    comparison,
+    isAnalyzing: isComparingImages,
+    analyzeComparison,
+    clearComparison,
+  } = useAIComparison()
+
+  const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing || isComparingImages
+
+  // Helper function to run AI comparison after conversion
+  const runAIComparison = useCallback(async (pngDataUrl: string, svgDataUrl: string) => {
+    logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
+    try {
+      const comparisonResult = await analyzeComparison(pngDataUrl, svgDataUrl)
+      if (comparisonResult) {
+        logActivity(
+          'AI Comparison complete',
+          `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
+          'ai-analysis',
+          'success'
+        )
+        toast.success('AI Comparison Complete', {
+          description: `${comparisonResult.similarityScore}% similar with ${comparisonResult.confidence}% confidence`,
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
+      logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error')
+      // Don't show error toast for comparison - it's an optional feature
+      console.error('AI comparison error:', errorMessage)
+    }
+  }, [logActivity, analyzeComparison])
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -173,6 +206,7 @@ function App() {
       if (files.length === 1) {
         // Clear previous job before processing new file
         clearJob()
+        clearComparison()
         logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
@@ -215,6 +249,9 @@ function App() {
                 },
               })
             }
+          } else if (job.status === 'completed') {
+            // Auto-run AI comparison after successful conversion
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
           }
         }
       } else {
@@ -223,7 +260,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -405,6 +442,7 @@ function App() {
       if (files.length === 1) {
         // Clear previous job before processing new file
         clearJob()
+        clearComparison()
         logActivity('Image uploaded', `Processing ${files[0].name}`, 'upload', 'pending')
         const job = await handleFileSelect(files[0])
         if (job) {
@@ -447,6 +485,9 @@ function App() {
                 },
               })
             }
+          } else if (job.status === 'completed') {
+            // Auto-run AI comparison after successful conversion
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
           }
         }
       } else {
@@ -455,7 +496,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {
@@ -466,18 +507,51 @@ function App() {
       return
     }
 
+    clearComparison()
+    logActivity('AI Iterative started', 'Running automatic quality improvement', 'ai-iteration', 'pending')
+    
     const result = await handleIterativeConversion(currentFile, settings)
     
     if (result) {
       setCurrentJob(result.job)
       updateSettings(result.settingsUsed)
       setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+      logActivity('AI Iterative complete', `Best result: ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
       
       toast.success('Iterative conversion complete!', {
         description: `Best result: ${result.likenessScore}% likeness`,
       })
     }
-  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob])
+  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity])
+
+  // Handler for one-click AI refinement from comparison card
+  const handleRefineWithAI = useCallback(async () => {
+    if (!currentFile) {
+      toast.error('No image selected', {
+        description: 'Please upload an image first',
+      })
+      return
+    }
+
+    clearComparison()
+    toast.info('Starting AI Refinement...', {
+      description: 'Automatically improving conversion quality based on comparison',
+    })
+    logActivity('AI Refinement started', 'Using comparison feedback to improve conversion', 'ai-iteration', 'pending')
+    
+    const result = await handleIterativeConversion(currentFile, settings)
+    
+    if (result) {
+      setCurrentJob(result.job)
+      updateSettings(result.settingsUsed)
+      setHistory((current) => [result.job, ...(current || [])].slice(0, 20))
+      logActivity('AI Refinement complete', `Improved to ${result.likenessScore}% likeness`, 'ai-iteration', 'success')
+      
+      toast.success('AI Refinement Complete!', {
+        description: `Best result: ${result.likenessScore}% likeness`,
+      })
+    }
+  }, [currentFile, settings, handleIterativeConversion, updateSettings, setHistory, setCurrentJob, clearComparison, logActivity])
 
   useKeyboardShortcuts(
     {
@@ -701,6 +775,14 @@ function App() {
               </div>
 
               <div className="space-y-4 md:space-y-6">
+                {comparison && (
+                  <ComparisonCard
+                    comparison={comparison}
+                    onRefineWithAI={handleRefineWithAI}
+                    onDismiss={clearComparison}
+                    isRefining={isIterativeProcessing}
+                  />
+                )}
                 {suggestion && (
                   <AISuggestionCard
                     suggestion={suggestion}
