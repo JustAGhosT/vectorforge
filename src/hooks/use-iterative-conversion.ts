@@ -21,6 +21,21 @@ export interface IterativeConversionConfig {
   targetLikeness: number
 }
 
+/** Default adjustment step when AI-suggested settings are unavailable */
+const FALLBACK_ADJUSTMENT_STEP = 0.1
+
+/**
+ * Creates fallback settings by incrementally adjusting the current settings.
+ * Used when AI suggestion fails or returns an error.
+ */
+function createFallbackSettings(currentSettings: ConversionSettings): ConversionSettings {
+  return {
+    complexity: Math.min(1, currentSettings.complexity + FALLBACK_ADJUSTMENT_STEP),
+    colorSimplification: Math.max(0, currentSettings.colorSimplification - FALLBACK_ADJUSTMENT_STEP),
+    pathSmoothing: Math.min(1, currentSettings.pathSmoothing + FALLBACK_ADJUSTMENT_STEP),
+  }
+}
+
 export function useIterativeConversion(initialConfig: IterativeConversionConfig) {
   const [config, setConfig] = useState<IterativeConversionConfig>(initialConfig)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -119,24 +134,13 @@ Return only the JSON, no other text.`
           response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
         } catch (llmError) {
           console.error('Settings suggestion LLM call failed:', llmError)
-          // Fallback to default adjustment if LLM fails
-          const adjustment = 0.1
-          return {
-            complexity: Math.min(1, currentSettings.complexity + adjustment),
-            colorSimplification: Math.max(0, currentSettings.colorSimplification - adjustment),
-            pathSmoothing: Math.min(1, currentSettings.pathSmoothing + adjustment),
-          }
+          return createFallbackSettings(currentSettings)
         }
         
         // Check if response looks like an error page (HTML)
         if (response.includes('<!DOCTYPE') || response.includes('<html')) {
           console.error('Settings suggestion received HTML error page')
-          const adjustment = 0.1
-          return {
-            complexity: Math.min(1, currentSettings.complexity + adjustment),
-            colorSimplification: Math.max(0, currentSettings.colorSimplification - adjustment),
-            pathSmoothing: Math.min(1, currentSettings.pathSmoothing + adjustment),
-          }
+          return createFallbackSettings(currentSettings)
         }
         
         const suggested = JSON.parse(response)
@@ -148,12 +152,7 @@ Return only the JSON, no other text.`
         }
       } catch (error) {
         console.error('Settings suggestion failed:', error)
-        const adjustment = 0.1
-        return {
-          complexity: Math.min(1, currentSettings.complexity + adjustment),
-          colorSimplification: Math.max(0, currentSettings.colorSimplification - adjustment),
-          pathSmoothing: Math.min(1, currentSettings.pathSmoothing + adjustment),
-        }
+        return createFallbackSettings(currentSettings)
       }
     },
     []
