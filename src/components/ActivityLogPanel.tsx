@@ -166,6 +166,13 @@ export function ActivityLogPanel({ entries, onClear, className }: ActivityLogPan
                           <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
                             {entry.description}
                           </p>
+                          {entry.status === 'error' && entry.details && (
+                            <div className="mt-1.5 p-2 bg-destructive/5 border border-destructive/20 rounded text-[10px] font-mono text-destructive/80 overflow-x-auto max-h-32 overflow-y-auto">
+                              <pre className="whitespace-pre-wrap break-words">
+                                {JSON.stringify(entry.details, null, 2)}
+                              </pre>
+                            </div>
+                          )}
                           <p className="text-[10px] text-muted-foreground/60 mt-1">
                             {formatRelativeTime(entry.timestamp)}
                           </p>
