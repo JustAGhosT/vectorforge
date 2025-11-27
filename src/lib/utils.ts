@@ -12,9 +12,7 @@ function isNotFoundTitle(title: string): boolean {
   const lowerTitle = title.toLowerCase()
   return (
     lowerTitle.includes('not found') ||
-    lowerTitle.includes('404') ||
-    lowerTitle === 'page not found' ||
-    lowerTitle === 'error'
+    lowerTitle.includes('404')
   )
 }
 
