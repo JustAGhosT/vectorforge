@@ -1,4 +1,5 @@
 import type { ConversionSettings } from './converter'
+import { parseLLMError } from './utils'
 
 export interface AIOptimizationSuggestion {
   suggestedComplexity: number
@@ -83,10 +84,20 @@ Return a JSON object with:
       throw new Error('AI service not available')
     }
 
-    const response = await window.spark.llm(promptText, 'gpt-4o', true)
+    let response: string
+    try {
+      response = await window.spark.llm(promptText, 'gpt-4o', true)
+    } catch (llmError) {
+      throw new Error(parseLLMError(llmError))
+    }
     
     if (!response) {
       throw new Error('No response from AI service')
+    }
+    
+    // Check if response looks like an error page (HTML)
+    if (response.includes('<!DOCTYPE') || response.includes('<html')) {
+      throw new Error('LLM service returned an error. Please try again later.')
     }
 
     const parsed = JSON.parse(response)
@@ -108,17 +119,9 @@ Return a JSON object with:
   } catch (error) {
     console.error('AI optimization failed:', error)
     
-    if (error instanceof Error) {
-      if (error.message.includes('network') || error.message.includes('fetch')) {
-        throw new Error('Network error: Unable to connect to AI service. Check your internet connection.')
-      }
-      if (error.message.includes('timeout')) {
-        throw new Error('AI analysis timed out. Please try again.')
-      }
-      throw new Error(`AI analysis failed: ${error.message}`)
-    }
-    
-    throw new Error('Failed to analyze image with AI. Please try again.')
+    // Re-throw with clean error message
+    const cleanMessage = parseLLMError(error)
+    throw new Error(cleanMessage)
   }
 }
 
