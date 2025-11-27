@@ -155,3 +155,92 @@ export function deleteCustomPreset(id: string): void {
 export function getAllPresets(): ConversionPreset[] {
   return [...BUILT_IN_PRESETS, ...loadCustomPresets()]
 }
+
+/**
+ * Export custom presets as JSON string
+ */
+export function exportPresetsAsJSON(): string {
+  const customPresets = loadCustomPresets()
+  return JSON.stringify(customPresets, null, 2)
+}
+
+/**
+ * Import presets from JSON string
+ * Returns the number of presets imported
+ */
+export function importPresetsFromJSON(jsonString: string): { imported: number; errors: string[] } {
+  const errors: string[] = []
+  let imported = 0
+  
+  try {
+    const presets = JSON.parse(jsonString)
+    
+    if (!Array.isArray(presets)) {
+      return { imported: 0, errors: ['Invalid format: expected an array of presets'] }
+    }
+    
+    const existingPresets = loadCustomPresets()
+    const existingIds = new Set(existingPresets.map(p => p.id))
+    const existingNames = new Set(existingPresets.map(p => p.name.toLowerCase()))
+    
+    const newPresets: ConversionPreset[] = []
+    
+    for (const preset of presets) {
+      // Validate preset structure
+      if (!preset.name || typeof preset.name !== 'string') {
+        errors.push(`Skipped preset: missing or invalid name`)
+        continue
+      }
+      
+      if (!preset.settings || typeof preset.settings !== 'object') {
+        errors.push(`Skipped "${preset.name}": missing or invalid settings`)
+        continue
+      }
+      
+      const { complexity, colorSimplification, pathSmoothing } = preset.settings
+      if (typeof complexity !== 'number' || typeof colorSimplification !== 'number' || typeof pathSmoothing !== 'number') {
+        errors.push(`Skipped "${preset.name}": invalid settings values`)
+        continue
+      }
+      
+      // Skip if preset with same name already exists
+      if (existingNames.has(preset.name.toLowerCase())) {
+        errors.push(`Skipped "${preset.name}": preset with same name already exists`)
+        continue
+      }
+      
+      // Generate unique ID using crypto.randomUUID if available, with fallback
+      const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID 
+        ? `custom-${crypto.randomUUID()}`
+        : `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      
+      // Generate new ID to avoid conflicts
+      const newPreset: ConversionPreset = {
+        id: uniqueId,
+        name: preset.name,
+        description: preset.description || `Imported preset`,
+        icon: 'custom',
+        settings: {
+          complexity: Math.max(0, Math.min(1, complexity)),
+          colorSimplification: Math.max(0, Math.min(1, colorSimplification)),
+          pathSmoothing: Math.max(0, Math.min(1, pathSmoothing)),
+          usePotrace: Boolean(preset.settings.usePotrace),
+        },
+        isCustom: true,
+      }
+      
+      newPresets.push(newPreset)
+      imported++
+    }
+    
+    if (newPresets.length > 0) {
+      const updatedPresets = [...existingPresets, ...newPresets]
+      localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updatedPresets))
+    }
+    
+  } catch (error) {
+    return { imported: 0, errors: ['Failed to parse JSON: ' + (error instanceof Error ? error.message : 'Unknown error')] }
+  }
+  
+  return { imported, errors }
+}

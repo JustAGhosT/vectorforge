@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Shapes,
   SquaresFour,
@@ -29,8 +30,11 @@ import {
   Plus,
   Star,
   Trash,
+  Export,
+  DownloadSimple,
+  UploadSimple,
 } from '@phosphor-icons/react'
-import { BUILT_IN_PRESETS, matchesPreset, loadCustomPresets, saveCustomPreset, deleteCustomPreset, type ConversionPreset } from '@/lib/presets'
+import { BUILT_IN_PRESETS, matchesPreset, loadCustomPresets, saveCustomPreset, deleteCustomPreset, exportPresetsAsJSON, importPresetsFromJSON, type ConversionPreset } from '@/lib/presets'
 import type { ConversionSettings } from '@/lib/converter'
 import { toast } from 'sonner'
 
@@ -51,8 +55,11 @@ const PRESET_ICONS: Record<string, React.ComponentType<{ className?: string; wei
 
 export function PresetSelector({ settings, onApplyPreset, disabled }: PresetSelectorProps) {
   const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [presetName, setPresetName] = useState('')
+  const [importJson, setImportJson] = useState('')
   const [customPresets, setCustomPresets] = useState(loadCustomPresets)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const currentPreset = matchesPreset(settings)
   const CurrentPresetIcon = currentPreset ? PRESET_ICONS[currentPreset.icon] : null
@@ -193,6 +200,39 @@ export function PresetSelector({ settings, onApplyPreset, disabled }: PresetSele
             <Plus className="w-4 h-4" weight="bold" />
             <span className="font-medium text-sm">Save Current as Preset</span>
           </DropdownMenuItem>
+          
+          {customPresets.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Import/Export
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => {
+                  const json = exportPresetsAsJSON()
+                  const blob = new Blob([json], { type: 'application/json' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = 'vectorforge-presets.json'
+                  a.click()
+                  URL.revokeObjectURL(url)
+                  toast.success('Presets exported')
+                }}
+                className="flex items-center gap-2 py-2 cursor-pointer"
+              >
+                <DownloadSimple className="w-4 h-4" weight="bold" />
+                <span className="text-sm">Export Presets</span>
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuItem
+            onClick={() => setShowImportDialog(true)}
+            className="flex items-center gap-2 py-2 cursor-pointer"
+          >
+            <UploadSimple className="w-4 h-4" weight="bold" />
+            <span className="text-sm">Import Presets</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -230,6 +270,83 @@ export function PresetSelector({ settings, onApplyPreset, disabled }: PresetSele
             </Button>
             <Button onClick={handleSavePreset}>
               Save Preset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Presets</DialogTitle>
+            <DialogDescription>
+              Paste JSON or upload a file to import presets.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="import-json">Preset JSON</Label>
+              <Textarea
+                id="import-json"
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                placeholder='[{"name": "My Preset", "settings": {...}}]'
+                className="h-32 font-mono text-xs"
+              />
+            </div>
+            <div className="text-center">
+              <span className="text-xs text-muted-foreground">or</span>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  const reader = new FileReader()
+                  reader.onload = (event) => {
+                    setImportJson(event.target?.result as string || '')
+                  }
+                  reader.readAsText(file)
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadSimple className="w-4 h-4 mr-2" />
+              Upload JSON File
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowImportDialog(false)
+              setImportJson('')
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (!importJson.trim()) {
+                toast.error('Please paste or upload preset JSON')
+                return
+              }
+              const result = importPresetsFromJSON(importJson)
+              if (result.imported > 0) {
+                toast.success(`Imported ${result.imported} preset(s)`)
+                setCustomPresets(loadCustomPresets())
+              }
+              if (result.errors.length > 0) {
+                result.errors.forEach(err => toast.error(err))
+              }
+              // Always close and reset after attempting import
+              setShowImportDialog(false)
+              setImportJson('')
+            }}>
+              Import
             </Button>
           </DialogFooter>
         </DialogContent>

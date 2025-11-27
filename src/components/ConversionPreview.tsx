@@ -52,17 +52,18 @@ export function ConversionPreview({
   const isMobile = useIsMobile()
   const previewRef = useRef<HTMLDivElement>(null)
 
-  // Checkerboard pattern styles
+  // Checkerboard pattern styles - adapts to dark mode using CSS variables
   const checkerboardStyle = showCheckerboard ? {
     backgroundImage: `
-      linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
-      linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
-      linear-gradient(-45deg, transparent 75%, #e0e0e0 75%)
+      linear-gradient(45deg, var(--checkerboard-color, #e0e0e0) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--checkerboard-color, #e0e0e0) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--checkerboard-color, #e0e0e0) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--checkerboard-color, #e0e0e0) 75%)
     `,
     backgroundSize: '20px 20px',
     backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-  } : {}
+    '--checkerboard-color': 'hsl(var(--muted))',
+  } as React.CSSProperties : {}
 
   usePinchZoom(previewRef, {
     onZoomChange: (delta) => {
