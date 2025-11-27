@@ -162,6 +162,30 @@ function App() {
 
   const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing || isComparingImages
 
+  // Helper function to run AI comparison after conversion
+  const runAIComparison = useCallback(async (pngDataUrl: string, svgDataUrl: string) => {
+    logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
+    try {
+      const comparisonResult = await analyzeComparison(pngDataUrl, svgDataUrl)
+      if (comparisonResult) {
+        logActivity(
+          'AI Comparison complete',
+          `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
+          'ai-analysis',
+          'success'
+        )
+        toast.success('AI Comparison Complete', {
+          description: `${comparisonResult.similarityScore}% similar with ${comparisonResult.confidence}% confidence`,
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
+      logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error')
+      // Don't show error toast for comparison - it's an optional feature
+      console.error('AI comparison error:', errorMessage)
+    }
+  }, [logActivity, analyzeComparison])
+
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
@@ -227,26 +251,7 @@ function App() {
             }
           } else if (job.status === 'completed') {
             // Auto-run AI comparison after successful conversion
-            logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
-            try {
-              const comparisonResult = await analyzeComparison(job.pngDataUrl, job.svgDataUrl)
-              if (comparisonResult) {
-                logActivity(
-                  'AI Comparison complete',
-                  `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
-                  'ai-analysis',
-                  'success'
-                )
-                toast.success('AI Comparison Complete', {
-                  description: `${comparisonResult.similarityScore}% similar with ${comparisonResult.confidence}% confidence`,
-                })
-              }
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
-              logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error')
-              // Don't show error toast for comparison - it's an optional feature
-              console.error('AI comparison error:', errorMessage)
-            }
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
           }
         }
       } else {
@@ -255,7 +260,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, analyzeComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -482,26 +487,7 @@ function App() {
             }
           } else if (job.status === 'completed') {
             // Auto-run AI comparison after successful conversion
-            logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
-            try {
-              const comparisonResult = await analyzeComparison(job.pngDataUrl, job.svgDataUrl)
-              if (comparisonResult) {
-                logActivity(
-                  'AI Comparison complete',
-                  `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
-                  'ai-analysis',
-                  'success'
-                )
-                toast.success('AI Comparison Complete', {
-                  description: `${comparisonResult.similarityScore}% similar with ${comparisonResult.confidence}% confidence`,
-                })
-              }
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'AI comparison failed'
-              logActivity('AI Comparison failed', errorMessage, 'ai-analysis', 'error')
-              // Don't show error toast for comparison - it's an optional feature
-              console.error('AI comparison error:', errorMessage)
-            }
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
           }
         }
       } else {
@@ -510,7 +496,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, analyzeComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {

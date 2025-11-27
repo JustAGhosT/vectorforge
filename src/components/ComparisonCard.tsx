@@ -15,7 +15,7 @@ import {
   Polygon,
   MagnifyingGlass,
   BoundingBox,
-  TextAa,
+  Gradient,
   Question,
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
@@ -36,7 +36,7 @@ const categoryIcons: Record<DifferenceItem['category'], React.ElementType> = {
   shape: Polygon,
   detail: MagnifyingGlass,
   edge: BoundingBox,
-  texture: TextAa,
+  texture: Gradient,
   other: Question,
 }
 
