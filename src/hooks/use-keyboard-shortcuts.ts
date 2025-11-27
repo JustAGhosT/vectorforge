@@ -8,6 +8,7 @@ interface ShortcutHandlers {
   onZoomReset?: () => void
   onUndo?: () => void
   onRedo?: () => void
+  onRetry?: () => void
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true) {
@@ -51,6 +52,12 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       if (modKey && e.shiftKey && e.key === 'z') {
         e.preventDefault()
         handlers.onRedo?.()
+      }
+
+      // Cmd/Ctrl + R for retry conversion
+      if (modKey && e.key === 'r') {
+        e.preventDefault()
+        handlers.onRetry?.()
       }
     }
 

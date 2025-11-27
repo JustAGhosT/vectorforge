@@ -32,6 +32,7 @@ interface BatchConversionProps {
   onDownload: (job: ConversionJob) => void
   onDownloadAll: () => void
   onClear: () => void
+  onRetryFailed?: (job: ConversionJob) => void
 }
 
 export function BatchConversion({
@@ -49,6 +50,7 @@ export function BatchConversion({
   onDownload,
   onDownloadAll,
   onClear,
+  onRetryFailed,
 }: BatchConversionProps) {
   const batchFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -123,6 +125,7 @@ export function BatchConversion({
           jobs={batchJobs}
           onDownload={onDownload}
           onDownloadAll={onDownloadAll}
+          onRetryFailed={onRetryFailed}
         />
       )}
     </Card>
@@ -223,10 +226,12 @@ function BatchResults({
   jobs,
   onDownload,
   onDownloadAll,
+  onRetryFailed,
 }: {
   jobs: ConversionJob[]
   onDownload: (job: ConversionJob) => void
   onDownloadAll: () => void
+  onRetryFailed?: (job: ConversionJob) => void
 }) {
   const successCount = jobs.filter((j) => j.status === 'completed').length
   const failCount = jobs.filter((j) => j.status === 'failed').length
@@ -290,16 +295,27 @@ function BatchResults({
                   </p>
                 </div>
               </div>
-              {job.status === 'completed' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onDownload(job)}
-                  className="flex-shrink-0 gap-2 min-h-[44px] md:min-h-0"
-                >
-                  <DownloadSimple weight="bold" className="w-4 h-4" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {job.status === 'completed' ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDownload(job)}
+                    className="flex-shrink-0 gap-2 min-h-[44px] md:min-h-0"
+                  >
+                    <DownloadSimple weight="bold" className="w-4 h-4" />
+                  </Button>
+                ) : onRetryFailed && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onRetryFailed(job)}
+                    className="flex-shrink-0 gap-2 min-h-[44px] md:min-h-0 text-xs"
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -154,6 +154,11 @@ export function IterativeConverter({
               <span className="text-muted-foreground">{Math.round(progress)}%</span>
             </div>
             <Progress value={progress} className="h-2" />
+            {iterations.length > 0 && (
+              <div className="text-xs text-muted-foreground text-center">
+                Current best: {iterations[iterations.length - 1]?.likenessScore || 0}% likeness
+              </div>
+            )}
           </motion.div>
         )}
 

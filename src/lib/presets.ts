@@ -11,9 +11,12 @@ export interface ConversionPreset {
   id: string
   name: string
   description: string
-  icon: 'logo' | 'icon' | 'illustration' | 'photo' | 'minimal'
+  icon: 'logo' | 'icon' | 'illustration' | 'photo' | 'minimal' | 'custom'
   settings: ConversionSettings
+  isCustom?: boolean
 }
+
+const CUSTOM_PRESETS_STORAGE_KEY = 'vectorforge-custom-presets'
 
 /**
  * Built-in presets optimized for different image types
@@ -85,17 +88,70 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
  * Get a preset by its ID
  */
 export function getPresetById(id: string): ConversionPreset | undefined {
-  return BUILT_IN_PRESETS.find(preset => preset.id === id)
+  const allPresets = [...BUILT_IN_PRESETS, ...loadCustomPresets()]
+  return allPresets.find(preset => preset.id === id)
 }
 
 /**
  * Check if settings match a preset
  */
 export function matchesPreset(settings: ConversionSettings): ConversionPreset | undefined {
-  return BUILT_IN_PRESETS.find(preset => 
+  const allPresets = [...BUILT_IN_PRESETS, ...loadCustomPresets()]
+  return allPresets.find(preset => 
     preset.settings.complexity === settings.complexity &&
     preset.settings.colorSimplification === settings.colorSimplification &&
     preset.settings.pathSmoothing === settings.pathSmoothing &&
     (preset.settings.usePotrace ?? false) === (settings.usePotrace ?? false)
   )
+}
+
+/**
+ * Load custom presets from localStorage
+ */
+export function loadCustomPresets(): ConversionPreset[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (error) {
+    console.error('Failed to load custom presets:', error)
+  }
+  return []
+}
+
+/**
+ * Save a custom preset
+ */
+export function saveCustomPreset(name: string, settings: ConversionSettings): ConversionPreset {
+  const customPresets = loadCustomPresets()
+  const newPreset: ConversionPreset = {
+    id: `custom-${Date.now()}`,
+    name,
+    description: `Custom preset: C${Math.round(settings.complexity * 100)}% S${Math.round(settings.colorSimplification * 100)}% P${Math.round(settings.pathSmoothing * 100)}%`,
+    icon: 'custom',
+    settings: { ...settings },
+    isCustom: true,
+  }
+  
+  const updatedPresets = [...customPresets, newPreset]
+  localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updatedPresets))
+  
+  return newPreset
+}
+
+/**
+ * Delete a custom preset
+ */
+export function deleteCustomPreset(id: string): void {
+  const customPresets = loadCustomPresets()
+  const updatedPresets = customPresets.filter(p => p.id !== id)
+  localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updatedPresets))
+}
+
+/**
+ * Get all presets (built-in + custom)
+ */
+export function getAllPresets(): ConversionPreset[] {
+  return [...BUILT_IN_PRESETS, ...loadCustomPresets()]
 }
