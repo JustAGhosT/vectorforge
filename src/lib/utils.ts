@@ -6,6 +6,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Checks if a title indicates a 404/Not Found error page.
+ */
+function isNotFoundTitle(title: string): boolean {
+  const lowerTitle = title.toLowerCase()
+  return (
+    lowerTitle.includes('not found') ||
+    lowerTitle.includes('404')
+  )
+}
+
+/**
  * Parses an LLM error message and extracts a user-friendly message.
  * Handles cases where the error contains HTML (e.g., 404 error pages) or HTTP status codes.
  */
@@ -19,6 +30,10 @@ export function parseLLMError(error: unknown): string {
       const titleMatch = message.match(/<title>([^<]*)<\/title>/i)
       if (titleMatch && titleMatch[1]) {
         const title = titleMatch[1].trim()
+        // Check if the title indicates a 404/Not Found error
+        if (isNotFoundTitle(title)) {
+          return 'LLM service endpoint not found. The AI service may be temporarily unavailable.'
+        }
         return `LLM service error: ${title}`
       }
       return 'LLM service is unavailable. Please try again later.'

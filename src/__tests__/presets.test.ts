@@ -1,12 +1,31 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { 
   BUILT_IN_PRESETS, 
   getPresetById, 
-  matchesPreset 
+  matchesPreset,
+  exportPresetsAsJSON,
+  importPresetsFromJSON,
 } from '../lib/presets'
 import type { ConversionSettings } from '../lib/converter'
 
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value },
+    removeItem: (key: string) => { delete store[key] },
+    clear: () => { store = {} },
+  }
+})()
+
+Object.defineProperty(global, 'localStorage', { value: localStorageMock })
+
 describe('Presets', () => {
+  beforeEach(() => {
+    localStorageMock.clear()
+  })
+
   describe('BUILT_IN_PRESETS', () => {
     it('should have 5 built-in presets', () => {
       expect(BUILT_IN_PRESETS).toHaveLength(5)
@@ -86,6 +105,66 @@ describe('Presets', () => {
       }
       const matched = matchesPreset(settingsWithoutPotrace)
       expect(matched).toBeUndefined()
+    })
+  })
+
+  describe('exportPresetsAsJSON', () => {
+    it('should return empty array when no custom presets', () => {
+      const json = exportPresetsAsJSON()
+      expect(json).toBe('[]')
+    })
+  })
+
+  describe('importPresetsFromJSON', () => {
+    it('should return error for invalid JSON', () => {
+      const result = importPresetsFromJSON('invalid json')
+      expect(result.imported).toBe(0)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('should return error for non-array JSON', () => {
+      const result = importPresetsFromJSON('{"name": "test"}')
+      expect(result.imported).toBe(0)
+      expect(result.errors).toContain('Invalid format: expected an array of presets')
+    })
+
+    it('should skip presets with missing name', () => {
+      const result = importPresetsFromJSON('[{"settings": {"complexity": 0.5}}]')
+      expect(result.imported).toBe(0)
+      expect(result.errors.some(e => e.includes('missing or invalid name'))).toBe(true)
+    })
+
+    it('should import valid presets', () => {
+      const validPreset = [{
+        name: 'Test Preset',
+        settings: {
+          complexity: 0.5,
+          colorSimplification: 0.5,
+          pathSmoothing: 0.5,
+          usePotrace: true,
+        }
+      }]
+      const result = importPresetsFromJSON(JSON.stringify(validPreset))
+      expect(result.imported).toBe(1)
+      expect(result.errors.length).toBe(0)
+    })
+
+    it('should skip duplicate names', () => {
+      // First import
+      const preset = [{
+        name: 'Duplicate Test',
+        settings: {
+          complexity: 0.5,
+          colorSimplification: 0.5,
+          pathSmoothing: 0.5,
+        }
+      }]
+      importPresetsFromJSON(JSON.stringify(preset))
+      
+      // Second import with same name
+      const result = importPresetsFromJSON(JSON.stringify(preset))
+      expect(result.imported).toBe(0)
+      expect(result.errors.some(e => e.includes('same name already exists'))).toBe(true)
     })
   })
 })

@@ -34,6 +34,8 @@ import { useIterativeConversion } from '@/hooks/use-iterative-conversion'
 import { useErrorStore } from '@/hooks/use-error-store'
 import { useActivityLog } from '@/hooks/use-activity-log'
 import { useAIComparison } from '@/hooks/use-ai-comparison'
+import { usePersistedPreferences } from '@/hooks/use-persisted-preferences'
+import { useComparisonHistory } from '@/hooks/use-comparison-history'
 import { UploadZone } from '@/components/UploadZone'
 import { ConversionPreview } from '@/components/ConversionPreview'
 import { SettingsPanel, SettingsInfoCard } from '@/components/SettingsPanel'
@@ -77,12 +79,15 @@ function App() {
   const [showSettingsHistory, setShowSettingsHistory] = useState(false)
   const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
-  const [enableAIIterative, setEnableAIIterative] = useState(false)
   const [showErrorLog, setShowErrorLog] = useState(false)
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [rightPanelTab, setRightPanelTab] = useState<'activity' | 'chat' | 'postprocess'>('activity')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentSvgContent, setCurrentSvgContent] = useState<string | null>(null)
+
+  // Persisted user preferences
+  const { preferences, updatePreference } = usePersistedPreferences()
+  const { history: comparisonHistory, addComparison } = useComparisonHistory()
 
   const { errors, addError, removeError, clearErrors, hasErrors, errorCount } = useErrorStore()
   const { entries: activityEntries, addEntry: addActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
@@ -104,6 +109,7 @@ function App() {
     complexity: 0.5,
     colorSimplification: 0.5,
     pathSmoothing: 0.5,
+    usePotrace: preferences.usePotrace,
   })
 
   const {
@@ -127,6 +133,7 @@ function App() {
     handleBatchConvert,
     handleDownloadAllBatch,
     clearBatch,
+    retryFailedJob,
   } = useBatchConversion(settings)
 
   const {
@@ -163,11 +170,14 @@ function App() {
   const isProcessing = isConversionProcessing || isBatchProcessing || isIterativeProcessing || isComparingImages
 
   // Helper function to run AI comparison after conversion
-  const runAIComparison = useCallback(async (pngDataUrl: string, svgDataUrl: string) => {
+  const runAIComparison = useCallback(async (pngDataUrl: string, svgDataUrl: string, filename?: string, iteration?: number) => {
     logActivity('AI Comparison started', 'Analyzing conversion quality...', 'ai-analysis', 'pending')
     try {
       const comparisonResult = await analyzeComparison(pngDataUrl, svgDataUrl)
       if (comparisonResult) {
+        // Add to comparison history
+        addComparison(comparisonResult, filename || 'Unknown', iteration)
+        
         logActivity(
           'AI Comparison complete',
           `Similarity: ${comparisonResult.similarityScore}% (${comparisonResult.confidence}% confidence)`,
@@ -184,7 +194,7 @@ function App() {
       // Don't show error toast for comparison - it's an optional feature
       console.error('AI comparison error:', errorMessage)
     }
-  }, [logActivity, analyzeComparison])
+  }, [logActivity, analyzeComparison, addComparison])
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -214,7 +224,7 @@ function App() {
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
           // If AI Iterative is enabled, run iterative conversion after initial conversion
-          if (enableAIIterative && job.status === 'completed') {
+          if (preferences.enableAIIterative && job.status === 'completed') {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
@@ -251,7 +261,7 @@ function App() {
             }
           } else if (job.status === 'completed') {
             // Auto-run AI comparison after successful conversion
-            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl, files[0].name)
           }
         }
       } else {
@@ -260,7 +270,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -450,7 +460,7 @@ function App() {
           setHistory((current) => [job, ...(current || [])].slice(0, 20))
           
           // If AI Iterative is enabled, run iterative conversion after initial conversion
-          if (enableAIIterative && job.status === 'completed') {
+          if (preferences.enableAIIterative && job.status === 'completed') {
             toast.info('Starting AI Iterative Refinement...', {
               description: 'Automatically improving conversion quality',
             })
@@ -487,7 +497,7 @@ function App() {
             }
           } else if (job.status === 'completed') {
             // Auto-run AI comparison after successful conversion
-            await runAIComparison(job.pngDataUrl, job.svgDataUrl)
+            await runAIComparison(job.pngDataUrl, job.svgDataUrl, files[0].name)
           }
         }
       } else {
@@ -496,7 +506,7 @@ function App() {
         setIsBatchMode(true)
       }
     },
-    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
+    [handleFileSelect, handleBatchFilesSelect, setHistory, clearJob, clearComparison, preferences.enableAIIterative, handleIterativeConversion, settings, updateSettings, setCurrentJob, addError, logActivity, runAIComparison]
   )
 
   const handleStartIterativeConversion = useCallback(async () => {
@@ -562,6 +572,7 @@ function App() {
       onZoomReset: handleZoomReset,
       onUndo: undoSettings,
       onRedo: redoSettings,
+      onRetry: handleReconvertAndSave,
     },
     !isProcessing
   )
@@ -771,6 +782,8 @@ function App() {
                   onNewImage={() => fileInputRef.current?.click()}
                   onZoomChange={setZoomLevel}
                   onRetry={handleReconvertAndSave}
+                  showCheckerboard={preferences.showCheckerboard}
+                  onToggleCheckerboard={() => updatePreference('showCheckerboard', !preferences.showCheckerboard)}
                 />
               </div>
 
@@ -805,8 +818,8 @@ function App() {
                   onRedo={redoSettings}
                   onAIOptimize={handleAIOptimize}
                   isAIOptimizing={isAnalyzing}
-                  enableAIIterative={enableAIIterative}
-                  onEnableAIIterativeChange={setEnableAIIterative}
+                  enableAIIterative={preferences.enableAIIterative}
+                  onEnableAIIterativeChange={(enabled) => updatePreference('enableAIIterative', enabled)}
                 />
                 <SettingsInfoCard />
                 
@@ -847,6 +860,8 @@ function App() {
                   onNewImage={() => fileInputRef.current?.click()}
                   onZoomChange={setZoomLevel}
                   onRetry={handleStartIterativeConversion}
+                  showCheckerboard={preferences.showCheckerboard}
+                  onToggleCheckerboard={() => updatePreference('showCheckerboard', !preferences.showCheckerboard)}
                 />
               </div>
 
@@ -892,6 +907,7 @@ function App() {
                 onDownload={handleDownload}
                 onDownloadAll={handleDownloadAllBatch}
                 onClear={clearBatch}
+                onRetryFailed={retryFailedJob}
               />
             </Suspense>
           </TabsContent>

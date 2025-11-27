@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,8 @@ import {
   DownloadSimple,
   MagnifyingGlassPlus,
   MagnifyingGlassMinus,
+  ArrowClockwise,
+  Checks,
 } from '@phosphor-icons/react'
 import { ConversionJob, formatFileSize } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -14,6 +16,7 @@ import { usePinchZoom } from '@/hooks/use-pinch-zoom'
 import { DraggableDivider } from '@/components/DraggableDivider'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 interface ConversionPreviewProps {
   job: ConversionJob | null
@@ -27,6 +30,8 @@ interface ConversionPreviewProps {
   onNewImage: () => void
   onZoomChange?: (zoom: number) => void
   onRetry?: () => void
+  showCheckerboard?: boolean
+  onToggleCheckerboard?: () => void
 }
 
 export function ConversionPreview({
@@ -41,9 +46,24 @@ export function ConversionPreview({
   onNewImage,
   onZoomChange,
   onRetry,
+  showCheckerboard = false,
+  onToggleCheckerboard,
 }: ConversionPreviewProps) {
   const isMobile = useIsMobile()
   const previewRef = useRef<HTMLDivElement>(null)
+
+  // Checkerboard pattern styles - adapts to dark mode using CSS variables
+  const checkerboardStyle = showCheckerboard ? {
+    backgroundImage: `
+      linear-gradient(45deg, var(--checkerboard-color, #e0e0e0) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--checkerboard-color, #e0e0e0) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--checkerboard-color, #e0e0e0) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--checkerboard-color, #e0e0e0) 75%)
+    `,
+    backgroundSize: '20px 20px',
+    backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+    '--checkerboard-color': 'hsl(var(--muted))',
+  } as React.CSSProperties : {}
 
   usePinchZoom(previewRef, {
     onZoomChange: (delta) => {
@@ -97,6 +117,17 @@ export function ConversionPreview({
                 </Badge>
               </div>
               <div className="flex items-center gap-1 ml-auto md:ml-0">
+                {onToggleCheckerboard && (
+                  <Button
+                    variant={showCheckerboard ? 'default' : 'ghost'}
+                    size="icon"
+                    onClick={onToggleCheckerboard}
+                    className="h-8 w-8 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                    title="Toggle checkerboard background for transparency"
+                  >
+                    <Checks className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -136,7 +167,7 @@ export function ConversionPreview({
                 <div className="absolute inset-0 flex">
                   <div
                     className="relative overflow-hidden"
-                    style={{ width: `${dividerPosition}%` }}
+                    style={{ width: `${dividerPosition}%`, ...checkerboardStyle }}
                   >
                     <div className="absolute inset-0 p-4 flex items-center justify-center">
                       <motion.img
@@ -161,7 +192,7 @@ export function ConversionPreview({
 
                   <div
                     className="relative overflow-hidden"
-                    style={{ width: `${100 - dividerPosition}%` }}
+                    style={{ width: `${100 - dividerPosition}%`, ...checkerboardStyle }}
                   >
                     <div className="absolute inset-0 p-4 flex items-center justify-center">
                       <motion.img
@@ -187,7 +218,10 @@ export function ConversionPreview({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Original PNG
                 </p>
-                <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none">
+                <div 
+                  className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none"
+                  style={checkerboardStyle}
+                >
                   <motion.img
                     src={job.pngDataUrl}
                     alt="Original"
@@ -202,7 +236,10 @@ export function ConversionPreview({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Converted SVG
                 </p>
-                <div className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none">
+                <div 
+                  className="aspect-square rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-center overflow-hidden touch-none"
+                  style={checkerboardStyle}
+                >
                   <motion.img
                     src={job.svgDataUrl}
                     alt="Converted"
@@ -223,6 +260,17 @@ export function ConversionPreview({
               <DownloadSimple weight="bold" />
               Download SVG
             </Button>
+            {onRetry && (
+              <Button
+                variant="outline"
+                onClick={onRetry}
+                className="gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                title="Retry conversion with current settings"
+              >
+                <ArrowClockwise weight="bold" />
+                Retry
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={onNewImage}

@@ -18,6 +18,7 @@ export function KeyboardShortcutsModal({
   const shortcuts = [
     { label: 'Upload file', key: `${modKey} + O` },
     { label: 'Download SVG', key: `${modKey} + S` },
+    { label: 'Retry conversion', key: `${modKey} + R` },
     { label: 'Zoom in', key: `${modKey} + =` },
     { label: 'Zoom out', key: `${modKey} + -` },
     { label: 'Reset zoom', key: `${modKey} + 0` },
@@ -57,7 +58,7 @@ export function KeyboardShortcutsModal({
             <div className="space-y-3">
               {shortcuts.map((shortcut, index) => (
                 <div key={index}>
-                  {(index === 2 || index === 5) && <Separator className="my-3" />}
+                  {(index === 3 || index === 6) && <Separator className="my-3" />}
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{shortcut.label}</span>
                     <Badge variant="secondary" className="font-mono text-xs">

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parseLLMError } from '../lib/utils'
 
 describe('parseLLMError', () => {
-  it('should extract title from HTML error page', () => {
+  it('should handle HTML error page with "Page not found" title as 404', () => {
     const htmlError = new Error(`404  - <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -12,7 +12,20 @@ describe('parseLLMError', () => {
 </html>`)
     
     const result = parseLLMError(htmlError)
-    expect(result).toBe('LLM service error: Page not found')
+    expect(result).toBe('LLM service endpoint not found. The AI service may be temporarily unavailable.')
+  })
+
+  it('should extract non-404 title from HTML error page', () => {
+    const htmlError = new Error(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Service Temporarily Down</title>
+  </head>
+  <body>Some content</body>
+</html>`)
+    
+    const result = parseLLMError(htmlError)
+    expect(result).toBe('LLM service error: Service Temporarily Down')
   })
 
   it('should handle HTML without title', () => {
