@@ -6,6 +6,7 @@ import {
   type ConversionJob,
   type ConversionSettings,
 } from '@/lib/converter'
+import { parseLLMError } from '@/lib/utils'
 
 export interface IterationResult {
   iteration: number
@@ -18,6 +19,21 @@ export interface IterationResult {
 export interface IterativeConversionConfig {
   maxIterations: number
   targetLikeness: number
+}
+
+/** Default adjustment step when AI-suggested settings are unavailable */
+const FALLBACK_ADJUSTMENT_STEP = 0.1
+
+/**
+ * Creates fallback settings by incrementally adjusting the current settings.
+ * Used when AI suggestion fails or returns an error.
+ */
+function createFallbackSettings(currentSettings: ConversionSettings): ConversionSettings {
+  return {
+    complexity: Math.min(1, currentSettings.complexity + FALLBACK_ADJUSTMENT_STEP),
+    colorSimplification: Math.max(0, currentSettings.colorSimplification - FALLBACK_ADJUSTMENT_STEP),
+    pathSmoothing: Math.min(1, currentSettings.pathSmoothing + FALLBACK_ADJUSTMENT_STEP),
+  }
 }
 
 export function useIterativeConversion(initialConfig: IterativeConversionConfig) {
@@ -52,7 +68,22 @@ Example response:
 
 Be critical but fair. Most conversions will score between 60-85.`
 
-        const response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+        let response: string
+        try {
+          response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+        } catch (llmError) {
+          throw new Error(parseLLMError(llmError))
+        }
+        
+        if (!response) {
+          throw new Error('No response from AI service')
+        }
+        
+        // Check if response looks like an error page (HTML)
+        if (response.includes('<!DOCTYPE') || response.includes('<html')) {
+          throw new Error('LLM service returned an error. Please try again later.')
+        }
+        
         const result = JSON.parse(response)
         
         return {
@@ -61,7 +92,7 @@ Be critical but fair. Most conversions will score between 60-85.`
         }
       } catch (error) {
         console.error('AI evaluation failed:', error)
-        throw new Error(`AI evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        throw new Error(parseLLMError(error))
       }
     },
     []
@@ -98,7 +129,20 @@ Provide your response as a JSON object with the three settings (each 0-1):
 
 Return only the JSON, no other text.`
 
-        const response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+        let response: string
+        try {
+          response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+        } catch (llmError) {
+          console.error('Settings suggestion LLM call failed:', llmError)
+          return createFallbackSettings(currentSettings)
+        }
+        
+        // Check if response looks like an error page (HTML)
+        if (response.includes('<!DOCTYPE') || response.includes('<html')) {
+          console.error('Settings suggestion received HTML error page')
+          return createFallbackSettings(currentSettings)
+        }
+        
         const suggested = JSON.parse(response)
 
         return {
@@ -108,12 +152,7 @@ Return only the JSON, no other text.`
         }
       } catch (error) {
         console.error('Settings suggestion failed:', error)
-        const adjustment = 0.1
-        return {
-          complexity: Math.min(1, currentSettings.complexity + adjustment),
-          colorSimplification: Math.max(0, currentSettings.colorSimplification - adjustment),
-          pathSmoothing: Math.min(1, currentSettings.pathSmoothing + adjustment),
-        }
+        return createFallbackSettings(currentSettings)
       }
     },
     []

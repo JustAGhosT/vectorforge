@@ -19,7 +19,7 @@ import {
   Check,
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { cn } from '@/lib/utils'
+import { cn, parseLLMError } from '@/lib/utils'
 import { toast } from 'sonner'
 
 interface ChatMessage {
@@ -89,7 +89,22 @@ Important rules:
 
 Modified SVG:`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o', false)
+    let response: string
+    try {
+      response = await window.spark.llm(prompt, 'gpt-4o', false)
+    } catch (error) {
+      // Re-throw with a cleaner error message
+      throw new Error(parseLLMError(error))
+    }
+    
+    if (!response) {
+      throw new Error('No response received from AI service')
+    }
+    
+    // Check if response looks like an error page (HTML)
+    if (response.includes('<!DOCTYPE') || response.includes('<html')) {
+      throw new Error('LLM service returned an error. Please try again later.')
+    }
     
     // Extract SVG from response (handle potential markdown wrapper)
     let svgContent = response.trim()
@@ -162,7 +177,7 @@ Modified SVG:`
         description: 'Click "Apply Changes" to see the result',
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to modify SVG'
+      const errorMessage = parseLLMError(error)
       
       setMessages(prev => prev.map(msg => 
         msg.id === assistantMessageId 
