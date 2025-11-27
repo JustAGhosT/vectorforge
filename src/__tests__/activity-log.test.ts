@@ -6,7 +6,7 @@ describe('useActivityLog', () => {
   it('should add an entry and return an id', () => {
     const { result } = renderHook(() => useActivityLog())
     
-    let entryId: string
+    let entryId: string = ''
     act(() => {
       entryId = result.current.addEntry({
         title: 'Test Entry',
@@ -16,7 +16,8 @@ describe('useActivityLog', () => {
       })
     })
 
-    expect(entryId!).toBeDefined()
+    expect(entryId).toBeDefined()
+    expect(typeof entryId).toBe('string')
     expect(result.current.entries.length).toBe(1)
     expect(result.current.entries[0].title).toBe('Test Entry')
     expect(result.current.entries[0].status).toBe('pending')
@@ -25,7 +26,7 @@ describe('useActivityLog', () => {
   it('should update an existing entry by id', () => {
     const { result } = renderHook(() => useActivityLog())
     
-    let entryId: string
+    let entryId: string = ''
     act(() => {
       entryId = result.current.addEntry({
         title: 'Processing',
@@ -38,7 +39,7 @@ describe('useActivityLog', () => {
     expect(result.current.entries[0].status).toBe('pending')
 
     act(() => {
-      result.current.updateEntry(entryId!, {
+      result.current.updateEntry(entryId, {
         title: 'Complete',
         description: 'Conversion finished',
         status: 'success',
@@ -54,7 +55,7 @@ describe('useActivityLog', () => {
   it('should update pending entry to error status', () => {
     const { result } = renderHook(() => useActivityLog())
     
-    let entryId: string
+    let entryId: string = ''
     act(() => {
       entryId = result.current.addEntry({
         title: 'AI Analysis started',
@@ -65,7 +66,7 @@ describe('useActivityLog', () => {
     })
 
     act(() => {
-      result.current.updateEntry(entryId!, {
+      result.current.updateEntry(entryId, {
         title: 'AI Analysis failed',
         description: 'Connection error',
         status: 'error',
@@ -81,7 +82,7 @@ describe('useActivityLog', () => {
   it('should preserve timestamp when updating entry', () => {
     const { result } = renderHook(() => useActivityLog())
     
-    let entryId: string
+    let entryId: string = ''
     act(() => {
       entryId = result.current.addEntry({
         title: 'Test',
@@ -94,7 +95,7 @@ describe('useActivityLog', () => {
     const originalTimestamp = result.current.entries[0].timestamp
 
     act(() => {
-      result.current.updateEntry(entryId!, {
+      result.current.updateEntry(entryId, {
         status: 'success',
       })
     })
