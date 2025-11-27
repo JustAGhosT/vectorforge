@@ -104,6 +104,43 @@ export function useBatchConversion(settings: ConversionSettings) {
     setProgress({ completed: 0, total: 0 })
   }, [])
 
+  const retryFailedJob = useCallback(async (failedJob: ConversionJob) => {
+    // Find the original file from batchFiles
+    const fileToRetry = batchFiles.find(f => f.name === failedJob.filename)
+    if (!fileToRetry) {
+      toast.error('Cannot retry', {
+        description: 'Original file not found',
+      })
+      return
+    }
+
+    try {
+      const jobs = await convertMultipleImages(
+        [fileToRetry],
+        settings,
+        () => {}
+      )
+
+      if (jobs.length > 0 && jobs[0].status === 'completed') {
+        // Replace the failed job with the successful one
+        setBatchJobs(prev => prev.map(j => 
+          j.id === failedJob.id ? jobs[0] : j
+        ))
+        toast.success('Retry successful', {
+          description: `${failedJob.filename} converted successfully`,
+        })
+      } else {
+        toast.error('Retry failed', {
+          description: jobs[0]?.error || 'Conversion failed again',
+        })
+      }
+    } catch (error) {
+      toast.error('Retry failed', {
+        description: error instanceof Error ? error.message : 'An error occurred',
+      })
+    }
+  }, [batchFiles, settings])
+
   return {
     batchFiles,
     batchJobs,
@@ -114,5 +151,6 @@ export function useBatchConversion(settings: ConversionSettings) {
     handleBatchConvert,
     handleDownloadAllBatch,
     clearBatch,
+    retryFailedJob,
   }
 }

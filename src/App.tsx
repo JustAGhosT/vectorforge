@@ -133,6 +133,7 @@ function App() {
     handleBatchConvert,
     handleDownloadAllBatch,
     clearBatch,
+    retryFailedJob,
   } = useBatchConversion(settings)
 
   const {
@@ -906,6 +907,7 @@ function App() {
                 onDownload={handleDownload}
                 onDownloadAll={handleDownloadAllBatch}
                 onClear={clearBatch}
+                onRetryFailed={retryFailedJob}
               />
             </Suspense>
           </TabsContent>
