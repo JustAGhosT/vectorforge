@@ -7,6 +7,7 @@ import {
   DownloadSimple,
   MagnifyingGlassPlus,
   MagnifyingGlassMinus,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 import { ConversionJob, formatFileSize } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -223,6 +224,17 @@ export function ConversionPreview({
               <DownloadSimple weight="bold" />
               Download SVG
             </Button>
+            {onRetry && (
+              <Button
+                variant="outline"
+                onClick={onRetry}
+                className="gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                title="Retry conversion with current settings"
+              >
+                <ArrowClockwise weight="bold" />
+                Retry
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={onNewImage}

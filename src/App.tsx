@@ -77,7 +77,7 @@ function App() {
   const [showSettingsHistory, setShowSettingsHistory] = useState(false)
   const [currentPage, setCurrentPage] = useState<'converter' | 'formats'>('converter')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
-  const [enableAIIterative, setEnableAIIterative] = useState(false)
+  const [enableAIIterative, setEnableAIIterative] = useState(true)
   const [showErrorLog, setShowErrorLog] = useState(false)
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [rightPanelTab, setRightPanelTab] = useState<'activity' | 'chat' | 'postprocess'>('activity')
@@ -104,6 +104,7 @@ function App() {
     complexity: 0.5,
     colorSimplification: 0.5,
     pathSmoothing: 0.5,
+    usePotrace: true,
   })
 
   const {
