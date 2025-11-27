@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getSimilarityLabel, getSeverityInfo, getCategoryIcon } from '../lib/ai-comparison'
+import { getSimilarityLabel, getSeverityInfo, getCategoryIcon, getRatingLabel } from '../lib/ai-comparison'
 
 describe('AI Comparison utilities', () => {
   describe('getSimilarityLabel', () => {
@@ -25,6 +25,32 @@ describe('AI Comparison utilities', () => {
       expect(getSimilarityLabel(59)).toEqual({ label: 'Needs Improvement', color: 'red' })
       expect(getSimilarityLabel(0)).toEqual({ label: 'Needs Improvement', color: 'red' })
       expect(getSimilarityLabel(30)).toEqual({ label: 'Needs Improvement', color: 'red' })
+    })
+  })
+
+  describe('getRatingLabel', () => {
+    it('should return "Excellent" for scores 85 and above', () => {
+      expect(getRatingLabel(85)).toEqual({ label: 'Excellent', color: 'green' })
+      expect(getRatingLabel(100)).toEqual({ label: 'Excellent', color: 'green' })
+      expect(getRatingLabel(92)).toEqual({ label: 'Excellent', color: 'green' })
+    })
+
+    it('should return "Good" for scores between 70 and 84', () => {
+      expect(getRatingLabel(70)).toEqual({ label: 'Good', color: 'yellow' })
+      expect(getRatingLabel(84)).toEqual({ label: 'Good', color: 'yellow' })
+      expect(getRatingLabel(77)).toEqual({ label: 'Good', color: 'yellow' })
+    })
+
+    it('should return "Fair" for scores between 50 and 69', () => {
+      expect(getRatingLabel(50)).toEqual({ label: 'Fair', color: 'orange' })
+      expect(getRatingLabel(69)).toEqual({ label: 'Fair', color: 'orange' })
+      expect(getRatingLabel(60)).toEqual({ label: 'Fair', color: 'orange' })
+    })
+
+    it('should return "Poor" for scores below 50', () => {
+      expect(getRatingLabel(49)).toEqual({ label: 'Poor', color: 'red' })
+      expect(getRatingLabel(0)).toEqual({ label: 'Poor', color: 'red' })
+      expect(getRatingLabel(25)).toEqual({ label: 'Poor', color: 'red' })
     })
   })
 

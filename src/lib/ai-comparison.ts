@@ -1,10 +1,21 @@
 import { parseLLMError } from './utils'
 
+export interface ImageRating {
+  /** Visual quality score (0-100) */
+  score: number
+  /** Explanation of why this rating was given */
+  reasoning: string
+}
+
 export interface ComparisonResult {
   /** Similarity score as a percentage (0-100) */
   similarityScore: number
   /** Confidence level of the similarity score (0-100) */
   confidence: number
+  /** Visual quality rating of the original image */
+  originalRating: ImageRating
+  /** Visual quality rating of the converted SVG */
+  convertedRating: ImageRating
   /** List of key differences between original and converted */
   differences: DifferenceItem[]
   /** Brief summary of the comparison */
@@ -36,8 +47,21 @@ export async function analyzeConversionComparison(
 Analyze both images and provide:
 1. A similarity score (0-100) indicating how closely the SVG matches the original
 2. A confidence level (0-100) for your similarity assessment
-3. A list of key differences between the images
-4. A brief summary
+3. Individual visual quality ratings for BOTH the original AND the converted image
+4. A list of key differences between the images
+5. A brief summary
+
+## Visual Quality Rating Guidelines:
+Rate each image on visual quality (0-100) considering:
+- **Clarity**: How clear and well-defined the image appears
+- **Aesthetics**: Overall visual appeal and professional appearance
+- **Usability**: How suitable it is for practical use (web, print, etc.)
+
+Note: The converted SVG might score HIGHER than the original if:
+- It has cleaner lines and edges
+- Colors are more consistent and unified
+- Noise or artifacts from the original are removed
+- The simplified vector style enhances the design
 
 ## Evaluation Criteria:
 - **Color Fidelity**: How well colors are preserved
@@ -57,6 +81,14 @@ Return a JSON object with:
 {
   "similarityScore": 0-100,
   "confidence": 0-100,
+  "originalRating": {
+    "score": 0-100,
+    "reasoning": "Brief explanation of the original image's visual quality rating"
+  },
+  "convertedRating": {
+    "score": 0-100,
+    "reasoning": "Brief explanation of the converted SVG's visual quality rating"
+  },
   "differences": [
     {
       "category": "color|shape|detail|edge|texture|other",
@@ -105,9 +137,22 @@ Return only valid JSON, no other text.`
         }))
       : []
 
+    // Parse and validate ratings
+    const originalRating: ImageRating = {
+      score: clamp(Number(parsed.originalRating?.score) || 70, 0, 100),
+      reasoning: String(parsed.originalRating?.reasoning || 'Original image quality assessed.').substring(0, 300),
+    }
+
+    const convertedRating: ImageRating = {
+      score: clamp(Number(parsed.convertedRating?.score) || 70, 0, 100),
+      reasoning: String(parsed.convertedRating?.reasoning || 'Converted SVG quality assessed.').substring(0, 300),
+    }
+
     return {
       similarityScore,
       confidence,
+      originalRating,
+      convertedRating,
       differences,
       summary: String(parsed.summary || 'Comparison completed.').substring(0, 500),
       timestamp: Date.now(),
@@ -151,6 +196,24 @@ export function getSimilarityLabel(score: number): {
     return { label: 'Fair', color: 'orange' }
   } else {
     return { label: 'Needs Improvement', color: 'red' }
+  }
+}
+
+/**
+ * Returns a human-readable label for image quality rating
+ */
+export function getRatingLabel(score: number): {
+  label: string
+  color: 'green' | 'yellow' | 'orange' | 'red'
+} {
+  if (score >= 85) {
+    return { label: 'Excellent', color: 'green' }
+  } else if (score >= 70) {
+    return { label: 'Good', color: 'yellow' }
+  } else if (score >= 50) {
+    return { label: 'Fair', color: 'orange' }
+  } else {
+    return { label: 'Poor', color: 'red' }
   }
 }
 
