@@ -5,6 +5,13 @@ export interface SvgModificationOptions {
   simplifyPaths?: boolean
   optimizeGroups?: boolean
   removeEmptyElements?: boolean
+  removeBackground?: boolean
+  addBorder?: {
+    type: 'rounded' | 'circle'
+    color: string
+    strokeWidth: number
+    padding: number
+  }
   customTransform?: (svg: string) => string
 }
 
@@ -166,6 +173,212 @@ function optimizeGroups(svg: string): string {
   return result
 }
 
+/**
+ * Remove background from SVG by identifying and removing background-like elements
+ * Background elements are typically:
+ * 1. The first/largest rectangle covering the entire viewBox
+ * 2. Elements with fill colors close to white/light gray
+ * 3. Elements with fill="white" or fill="#fff*"
+ */
+function removeBackground(svg: string): string {
+  // Parse SVG dimensions
+  const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/i)
+  const widthMatch = svg.match(/width=["']([^"']+)["']/i)
+  const heightMatch = svg.match(/height=["']([^"']+)["']/i)
+  
+  let svgWidth = 0
+  let svgHeight = 0
+  
+  if (viewBoxMatch) {
+    const parts = viewBoxMatch[1].split(/\s+/)
+    svgWidth = parseFloat(parts[2]) || 0
+    svgHeight = parseFloat(parts[3]) || 0
+  } else if (widthMatch && heightMatch) {
+    svgWidth = parseFloat(widthMatch[1]) || 0
+    svgHeight = parseFloat(heightMatch[1]) || 0
+  }
+  
+  // Threshold for considering a color as "background" (near-white)
+  const BACKGROUND_COLOR_THRESHOLD = 245
+  
+  // Check if a color is a background-like color (white, near-white, light gray)
+  const isBackgroundColor = (color: string): boolean => {
+    if (!color) return false
+    
+    // Common background colors
+    const bgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255, 255, 255)']
+    const normalizedColor = color.toLowerCase().replace(/\s/g, '')
+    if (bgColors.includes(normalizedColor)) return true
+    
+    // Check for light colors (RGB values close to 255)
+    const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
+    if (rgbMatch) {
+      const [, r, g, b] = rgbMatch.map(Number)
+      // If all channels are above threshold, consider it a background
+      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+    }
+    
+    // Check hex colors
+    const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
+    if (hexMatch) {
+      const r = parseInt(hexMatch[1], 16)
+      const g = parseInt(hexMatch[2], 16)
+      const b = parseInt(hexMatch[3], 16)
+      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+    }
+    
+    return false
+  }
+  
+  // Check if a rect covers the full SVG area
+  const isFullCoverRect = (rectStr: string): boolean => {
+    const xMatch = rectStr.match(/\bx=["']([^"']+)["']/i)
+    const yMatch = rectStr.match(/\by=["']([^"']+)["']/i)
+    const wMatch = rectStr.match(/\bwidth=["']([^"']+)["']/i)
+    const hMatch = rectStr.match(/\bheight=["']([^"']+)["']/i)
+    
+    const x = xMatch ? parseFloat(xMatch[1]) : 0
+    const y = yMatch ? parseFloat(yMatch[1]) : 0
+    const w = wMatch ? parseFloat(wMatch[1]) : 0
+    const h = hMatch ? parseFloat(hMatch[1]) : 0
+    
+    // If rect starts at 0,0 and covers most of the SVG
+    if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
+      return true
+    }
+    return false
+  }
+  
+  let result = svg
+  
+  // Remove full-coverage rectangles with background colors
+  result = result.replace(
+    /<rect[^>]*>/gi,
+    (match) => {
+      const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+      const fill = fillMatch ? fillMatch[1] : ''
+      
+      if (isBackgroundColor(fill) && isFullCoverRect(match)) {
+        return '' // Remove the background rect
+      }
+      return match
+    }
+  )
+  
+  // Also check for path elements that might be background rectangles
+  // (some converters use paths instead of rects)
+  result = result.replace(
+    /<path[^>]*d=["']([^"']+)["'][^>]*>/gi,
+    (match, dAttr) => {
+      const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+      const fill = fillMatch ? fillMatch[1] : ''
+      
+      // Check if the path is a simple rectangle covering the full area
+      // Simple rectangular paths have patterns like "M0 0H{width}V{height}H0Z" or similar
+      const isRectPath = /^M\s*0[\s,]+0[\s,]*[HhLl].*[VvLl].*[HhLl].*[Zz]?\s*$/i.test(dAttr.trim())
+      
+      if (isBackgroundColor(fill) && isRectPath) {
+        // Additionally verify it covers significant area by path commands
+        return '' // Remove the background path
+      }
+      return match
+    }
+  )
+  
+  // Clean up any resulting empty lines
+  result = result.replace(/\n\s*\n/g, '\n')
+  
+  return result
+}
+
+/**
+ * Add a decorative border around the SVG content
+ */
+function addBorder(
+  svg: string, 
+  borderType: 'rounded' | 'circle', 
+  color: string, 
+  strokeWidth: number,
+  padding: number
+): string {
+  // Parse SVG dimensions
+  const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/i)
+  const widthMatch = svg.match(/width=["']([^"']+)["']/i)
+  const heightMatch = svg.match(/height=["']([^"']+)["']/i)
+  
+  let svgWidth = 0
+  let svgHeight = 0
+  let viewBoxX = 0
+  let viewBoxY = 0
+  
+  if (viewBoxMatch) {
+    const parts = viewBoxMatch[1].split(/\s+/)
+    viewBoxX = parseFloat(parts[0]) || 0
+    viewBoxY = parseFloat(parts[1]) || 0
+    svgWidth = parseFloat(parts[2]) || 0
+    svgHeight = parseFloat(parts[3]) || 0
+  } else if (widthMatch && heightMatch) {
+    svgWidth = parseFloat(widthMatch[1]) || 0
+    svgHeight = parseFloat(heightMatch[1]) || 0
+  }
+  
+  if (!svgWidth || !svgHeight) return svg
+  
+  // Calculate new dimensions with padding
+  const newViewBoxX = viewBoxX - padding
+  const newViewBoxY = viewBoxY - padding
+  const newWidth = svgWidth + (padding * 2)
+  const newHeight = svgHeight + (padding * 2)
+  
+  // Create border element
+  let borderElement = ''
+  const halfStroke = strokeWidth / 2
+  
+  if (borderType === 'circle') {
+    const centerX = viewBoxX + svgWidth / 2
+    const centerY = viewBoxY + svgHeight / 2
+    const radius = Math.max(svgWidth, svgHeight) / 2 + padding - halfStroke
+    borderElement = `<circle cx="${centerX}" cy="${centerY}" r="${radius}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" />`
+  } else {
+    // Rounded rectangle
+    const cornerRadius = Math.min(svgWidth, svgHeight) * 0.1 // 10% corner radius
+    borderElement = `<rect x="${newViewBoxX + halfStroke}" y="${newViewBoxY + halfStroke}" width="${newWidth - strokeWidth}" height="${newHeight - strokeWidth}" rx="${cornerRadius}" ry="${cornerRadius}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" />`
+  }
+  
+  // Update viewBox and add border
+  let result = svg
+  
+  // Update viewBox
+  if (viewBoxMatch) {
+    result = result.replace(
+      /viewBox=["'][^"']+["']/i,
+      `viewBox="${newViewBoxX} ${newViewBoxY} ${newWidth} ${newHeight}"`
+    )
+  } else {
+    // Add viewBox if missing
+    result = result.replace(
+      /<svg/i,
+      `<svg viewBox="${newViewBoxX} ${newViewBoxY} ${newWidth} ${newHeight}"`
+    )
+  }
+  
+  // Update width/height if present
+  if (widthMatch) {
+    result = result.replace(/width=["'][^"']+["']/i, `width="${newWidth}"`)
+  }
+  if (heightMatch) {
+    result = result.replace(/height=["'][^"']+["']/i, `height="${newHeight}"`)
+  }
+  
+  // Insert border element at the beginning of SVG content
+  result = result.replace(
+    /(<svg[^>]*>)/i,
+    `$1\n  ${borderElement}`
+  )
+  
+  return result
+}
+
 export function useSvgModification() {
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -178,6 +391,11 @@ export function useSvgModification() {
     
     try {
       let result = svg
+      
+      // Remove background first (before other operations)
+      if (options.removeBackground) {
+        result = removeBackground(result)
+      }
       
       if (options.removePotraceBlocks) {
         result = removeColorBlocks(result)
@@ -193,6 +411,17 @@ export function useSvgModification() {
       
       if (options.optimizeGroups) {
         result = optimizeGroups(result)
+      }
+      
+      // Add border last (after all other operations)
+      if (options.addBorder) {
+        result = addBorder(
+          result, 
+          options.addBorder.type, 
+          options.addBorder.color, 
+          options.addBorder.strokeWidth,
+          options.addBorder.padding
+        )
       }
       
       if (options.customTransform) {
@@ -213,5 +442,7 @@ export function useSvgModification() {
     removeEmptyElements,
     simplifyPaths,
     optimizeGroups,
+    removeBackground,
+    addBorder,
   }
 }

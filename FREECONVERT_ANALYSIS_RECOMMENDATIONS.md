@@ -258,6 +258,67 @@ VectorForge already has several features that **exceed** FreeConvert.com:
 
 ---
 
+## Post-Processing Improvements (New)
+
+Based on user feedback about common post-conversion operations like background removal and border addition, we've added dedicated post-processing tools:
+
+### New Post-Processing Features
+
+#### 1. Background Removal
+**Problem**: Users often need to remove white/light backgrounds from converted SVGs for transparency.
+
+**Solution**: Added intelligent background removal that:
+- Detects and removes full-coverage white/light rectangles
+- Identifies background colors close to white (RGB > 245)
+- Works with both `<rect>` elements and rectangular `<path>` elements
+- Preserves the actual content while removing background
+
+#### 2. Border Addition
+**Problem**: Users need to add decorative borders but existing tools often apply incorrect colors or positioning.
+
+**Solution**: Added configurable border addition with:
+- **Border Type Selection**: Rounded rectangle or Circle
+- **Color Picker**: Preset colors (Black, White, Red, Blue, Green, Purple, Orange)
+- **Stroke Width Control**: 1-10px adjustable slider
+- **Padding Control**: 0-50px adjustable slider
+
+### User Experience Improvements
+
+The post-processing panel is now organized into collapsible sections:
+
+1. **Background Section** (expanded by default)
+   - One-click "Remove Background" button
+   - Clear description of what will be removed
+
+2. **Add Border Section** (expanded by default)
+   - Visual toggle between Rounded and Circle borders
+   - Color dropdown with color previews
+   - Stroke width slider with pixel indicator
+   - Padding slider with pixel indicator
+   - "Apply Border" button
+
+3. **Optimization Section** (collapsed by default)
+   - Merge Colors
+   - Simplify Paths
+   - Optimize Groups
+   - Remove Empty Elements
+
+4. **Full Optimization Button**
+   - Now includes background removal in the optimization pipeline
+   - Single click applies all optimizations
+
+### Workflow Recommendations
+
+For best results with background removal and borders:
+
+1. **First**: Remove background to ensure transparency
+2. **Then**: Add border with desired settings
+3. **Finally**: Run optimization if needed to reduce file size
+
+This order ensures borders are applied correctly without interference from background elements.
+
+---
+
 ## Conclusion
 
 FreeConvert.com excels at providing **granular control** over the vectorization process through detailed settings. VectorForge can adopt some of these features while leveraging its existing **AI capabilities** as a key differentiator.
