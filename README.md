@@ -216,6 +216,8 @@ npm run lint     # Run linter
 | Document | Description |
 |----------|-------------|
 | [PRD.md](./docs/PRD.md) | Product requirements and design specs |
+| [AI_ROADMAP.md](./docs/AI_ROADMAP.md) | AI integration plan and roadmap |
+| [CHANGELOG.md](./docs/CHANGELOG.md) | Features completed and planned |
 | [CONVERSION_ANALYSIS.md](./docs/CONVERSION_ANALYSIS.md) | Deep dive into algorithms |
 | [PIPELINE_QUICKSTART.md](./docs/PIPELINE_QUICKSTART.md) | Custom pipeline guide |
 | [ENVIRONMENT_SETUP.md](./docs/ENVIRONMENT_SETUP.md) | AI configuration |
