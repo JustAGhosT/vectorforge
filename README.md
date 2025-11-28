@@ -137,7 +137,7 @@ VectorForge includes AI-powered analysis to automatically optimize your conversi
    - Potential warnings
 4. **Apply or adjust** the suggestions
 
-> 📝 **Note**: AI features require Azure AI or OpenAI configuration. See [Environment Setup](./ENVIRONMENT_SETUP.md) for configuration.
+> 📝 **Note**: AI features require Azure AI or OpenAI configuration. See [Environment Setup](./docs/ENVIRONMENT_SETUP.md) for configuration.
 
 ---
 
@@ -178,10 +178,11 @@ vectorforge/
 │       ├── converter.ts     # Main converter
 │       ├── pipeline/        # Modular conversion stages
 │       └── ai-optimizer.ts  # AI analysis
-├── PRD.md                   # Product requirements
-├── CONVERSION_ANALYSIS.md   # Algorithm documentation
-├── PIPELINE_QUICKSTART.md   # Pipeline usage guide
-└── ENVIRONMENT_SETUP.md     # Configuration guide
+├── docs/                    # Documentation files
+│   ├── PRD.md               # Product requirements
+│   ├── CONVERSION_ANALYSIS.md   # Algorithm documentation
+│   ├── PIPELINE_QUICKSTART.md   # Pipeline usage guide
+│   └── ENVIRONMENT_SETUP.md     # Configuration guide
 ```
 
 ---
@@ -214,11 +215,11 @@ npm run lint     # Run linter
 
 | Document | Description |
 |----------|-------------|
-| [PRD.md](./PRD.md) | Product requirements and design specs |
-| [CONVERSION_ANALYSIS.md](./CONVERSION_ANALYSIS.md) | Deep dive into algorithms |
-| [PIPELINE_QUICKSTART.md](./PIPELINE_QUICKSTART.md) | Custom pipeline guide |
-| [ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md) | AI configuration |
-| [ERROR_HANDLING.md](./ERROR_HANDLING.md) | Error handling details |
+| [PRD.md](./docs/PRD.md) | Product requirements and design specs |
+| [CONVERSION_ANALYSIS.md](./docs/CONVERSION_ANALYSIS.md) | Deep dive into algorithms |
+| [PIPELINE_QUICKSTART.md](./docs/PIPELINE_QUICKSTART.md) | Custom pipeline guide |
+| [ENVIRONMENT_SETUP.md](./docs/ENVIRONMENT_SETUP.md) | AI configuration |
+| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md) | Error handling details |
 | [SECURITY.md](./SECURITY.md) | Security policy |
 
 ---

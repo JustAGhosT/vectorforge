@@ -448,11 +448,11 @@ By prioritizing user value, maintaining code quality, and building on a solid fo
 
 ## Resources
 
-- **Documentation**: `/workspaces/spark-template/WAVE_1_IMPLEMENTATION.md`
-- **Roadmap**: `/workspaces/spark-template/ROADMAP_WAVES_2-4.md`
-- **PRD**: `/workspaces/spark-template/PRD.md`
-- **Original Analysis**: `/workspaces/spark-template/IMPROVEMENTS.md`
-- **Codebase**: `/workspaces/spark-template/src/`
+- **Documentation**: [WAVE_1_IMPLEMENTATION.md](./WAVE_1_IMPLEMENTATION.md)
+- **Roadmap**: [ROADMAP_WAVES_2-4.md](./ROADMAP_WAVES_2-4.md)
+- **PRD**: [PRD.md](./PRD.md)
+- **Original Analysis**: [IMPROVEMENTS.md](./IMPROVEMENTS.md)
+- **Codebase**: `../src/`
 
 ---
 
