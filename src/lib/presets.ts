@@ -32,6 +32,9 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
       colorSimplification: 0.5,
       pathSmoothing: 0.6,
       usePotrace: true,
+      colorMode: 'colored',
+      filterSpeckle: 5,
+      curveFitting: 'spline',
     },
   },
   {
@@ -44,6 +47,9 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
       colorSimplification: 0.7,
       pathSmoothing: 0.6,
       usePotrace: true,
+      colorMode: 'colored',
+      filterSpeckle: 10,
+      curveFitting: 'polygon',
     },
   },
   {
@@ -56,6 +62,9 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
       colorSimplification: 0.3,
       pathSmoothing: 0.5,
       usePotrace: true,
+      colorMode: 'colored',
+      filterSpeckle: 2,
+      curveFitting: 'spline',
     },
   },
   {
@@ -68,6 +77,9 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
       colorSimplification: 0.15,
       pathSmoothing: 0.4,
       usePotrace: false,
+      colorMode: 'colored',
+      filterSpeckle: 0,
+      curveFitting: 'spline',
     },
   },
   {
@@ -80,6 +92,39 @@ export const BUILT_IN_PRESETS: ConversionPreset[] = [
       colorSimplification: 0.8,
       pathSmoothing: 0.7,
       usePotrace: true,
+      colorMode: 'colored',
+      filterSpeckle: 15,
+      curveFitting: 'polygon',
+    },
+  },
+  {
+    id: 'bw-logo',
+    name: 'B&W Logo',
+    description: 'High contrast black & white',
+    icon: 'logo',
+    settings: {
+      complexity: 0.5,
+      colorSimplification: 1.0,
+      pathSmoothing: 0.6,
+      usePotrace: true,
+      colorMode: 'blackAndWhite',
+      filterSpeckle: 5,
+      curveFitting: 'spline',
+    },
+  },
+  {
+    id: 'pixel-art',
+    name: 'Pixel Art',
+    description: 'Preserve pixel edges',
+    icon: 'icon',
+    settings: {
+      complexity: 1.0,
+      colorSimplification: 0.2,
+      pathSmoothing: 0,
+      usePotrace: false,
+      colorMode: 'colored',
+      filterSpeckle: 0,
+      curveFitting: 'pixel',
     },
   },
 ]
@@ -101,7 +146,10 @@ export function matchesPreset(settings: ConversionSettings): ConversionPreset | 
     preset.settings.complexity === settings.complexity &&
     preset.settings.colorSimplification === settings.colorSimplification &&
     preset.settings.pathSmoothing === settings.pathSmoothing &&
-    (preset.settings.usePotrace ?? false) === (settings.usePotrace ?? false)
+    (preset.settings.usePotrace ?? false) === (settings.usePotrace ?? false) &&
+    (preset.settings.colorMode ?? 'colored') === (settings.colorMode ?? 'colored') &&
+    (preset.settings.filterSpeckle ?? 0) === (settings.filterSpeckle ?? 0) &&
+    (preset.settings.curveFitting ?? 'spline') === (settings.curveFitting ?? 'spline')
   )
 }
 
@@ -125,10 +173,20 @@ export function loadCustomPresets(): ConversionPreset[] {
  */
 export function saveCustomPreset(name: string, settings: ConversionSettings): ConversionPreset {
   const customPresets = loadCustomPresets()
+  const colorModeLabel = settings.colorMode === 'blackAndWhite' ? 'B&W' : 'Color'
+  
+  // Map curve fitting mode to short label
+  const curveModeLabels: Record<string, string> = {
+    polygon: 'Poly',
+    pixel: 'Pix',
+    spline: 'Spln',
+  }
+  const curveModeLabel = curveModeLabels[settings.curveFitting ?? 'spline'] ?? 'Spln'
+  
   const newPreset: ConversionPreset = {
     id: `custom-${Date.now()}`,
     name,
-    description: `Custom preset: C${Math.round(settings.complexity * 100)}% S${Math.round(settings.colorSimplification * 100)}% P${Math.round(settings.pathSmoothing * 100)}%`,
+    description: `Custom: ${colorModeLabel}, ${curveModeLabel}, C${Math.round(settings.complexity * 100)}%`,
     icon: 'custom',
     settings: { ...settings },
     isCustom: true,
@@ -214,6 +272,14 @@ export function importPresetsFromJSON(jsonString: string): { imported: number; e
         ? `custom-${crypto.randomUUID()}`
         : `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
       
+      // Valid curve fitting modes
+      const validCurveFittingModes = ['spline', 'polygon', 'pixel'] as const
+      type CurveFittingMode = typeof validCurveFittingModes[number]
+      
+      const isCurveFittingMode = (value: unknown): value is CurveFittingMode => {
+        return typeof value === 'string' && validCurveFittingModes.includes(value as CurveFittingMode)
+      }
+      
       // Generate new ID to avoid conflicts
       const newPreset: ConversionPreset = {
         id: uniqueId,
@@ -225,6 +291,12 @@ export function importPresetsFromJSON(jsonString: string): { imported: number; e
           colorSimplification: Math.max(0, Math.min(1, colorSimplification)),
           pathSmoothing: Math.max(0, Math.min(1, pathSmoothing)),
           usePotrace: Boolean(preset.settings.usePotrace),
+          colorMode: preset.settings.colorMode === 'blackAndWhite' ? 'blackAndWhite' : 'colored',
+          filterSpeckle: Math.max(0, Math.min(50, preset.settings.filterSpeckle ?? 0)),
+          curveFitting: isCurveFittingMode(preset.settings.curveFitting) 
+            ? preset.settings.curveFitting 
+            : 'spline',
+          cornerThreshold: Math.max(0, Math.min(180, preset.settings.cornerThreshold ?? 90)),
         },
         isCustom: true,
       }

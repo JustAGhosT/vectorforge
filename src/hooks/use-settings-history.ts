@@ -24,7 +24,7 @@ export function useSettingsHistory(initialSettings: ConversionSettings) {
   )
 
   const handleSettingChange = useCallback(
-    (key: keyof ConversionSettings, value: number | boolean) => {
+    (key: keyof ConversionSettings, value: number | boolean | string) => {
       const newSettings = { ...settings, [key]: value }
       setSettings(newSettings)
       addToSettingsHistory(newSettings)

@@ -1,10 +1,12 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Slider } from '@/components/ui/slider'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   MagicWand,
   Path,
@@ -12,8 +14,12 @@ import {
   Trash,
   Stack,
   ArrowClockwise,
-  CheckCircle,
   Info,
+  CaretDown,
+  Eraser,
+  FrameCorners,
+  Circle,
+  RectangleDashed,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useSvgModification, type SvgModificationOptions } from '@/hooks/use-svg-modification'
@@ -26,13 +32,16 @@ interface SvgPostProcessingPanelProps {
   className?: string
 }
 
-interface ProcessingOption {
-  id: keyof SvgModificationOptions
-  label: string
-  description: string
-  icon: typeof MagicWand
-  enabled: boolean
-}
+// Border color presets
+const BORDER_COLORS = [
+  { label: 'Black', value: '#000000' },
+  { label: 'White', value: '#ffffff' },
+  { label: 'Red', value: '#ef4444' },
+  { label: 'Blue', value: '#3b82f6' },
+  { label: 'Green', value: '#22c55e' },
+  { label: 'Purple', value: '#8b5cf6' },
+  { label: 'Orange', value: '#f97316' },
+]
 
 export function SvgPostProcessingPanel({
   currentSvg,
@@ -42,10 +51,47 @@ export function SvgPostProcessingPanel({
 }: SvgPostProcessingPanelProps) {
   const { getSvgInfo, modifySvg, isProcessing } = useSvgModification()
   
+  // Border settings state
+  const [borderType, setBorderType] = useState<'rounded' | 'circle'>('rounded')
+  const [borderColor, setBorderColor] = useState('#000000')
+  const [borderWidth, setBorderWidth] = useState(2)
+  const [borderPadding, setBorderPadding] = useState(10)
+  
   const svgInfo = useMemo(() => {
     if (!currentSvg) return null
     return getSvgInfo(currentSvg)
   }, [currentSvg, getSvgInfo])
+
+  // Background removal
+  const handleRemoveBackground = useCallback(() => {
+    if (!currentSvg) return
+    
+    const modified = modifySvg(currentSvg, { removeBackground: true })
+    onApplyChange(modified)
+    onActivityLog?.('Removed background', 'White/light background elements removed')
+    toast.success('Background removed', {
+      description: 'White and light-colored backgrounds have been removed',
+    })
+  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+
+  // Add border
+  const handleAddBorder = useCallback(() => {
+    if (!currentSvg) return
+    
+    const modified = modifySvg(currentSvg, { 
+      addBorder: {
+        type: borderType,
+        color: borderColor,
+        strokeWidth: borderWidth,
+        padding: borderPadding,
+      }
+    })
+    onApplyChange(modified)
+    onActivityLog?.(`Added ${borderType} border`, `${borderColor} border with ${borderWidth}px stroke`)
+    toast.success('Border added', {
+      description: `${borderType === 'circle' ? 'Circle' : 'Rounded'} border has been added`,
+    })
+  }, [currentSvg, modifySvg, onApplyChange, onActivityLog, borderType, borderColor, borderWidth, borderPadding])
 
   const handleRemoveColorBlocks = useCallback(() => {
     if (!currentSvg) return
@@ -95,13 +141,14 @@ export function SvgPostProcessingPanel({
     if (!currentSvg) return
     
     const modified = modifySvg(currentSvg, {
+      removeBackground: true,
       removePotraceBlocks: true,
       simplifyPaths: true,
       optimizeGroups: true,
       removeEmptyElements: true,
     })
     onApplyChange(modified)
-    onActivityLog?.('Full SVG optimization', 'Applied all optimization techniques')
+    onActivityLog?.('Full SVG optimization', 'Applied all optimization techniques including background removal')
     toast.success('SVG fully optimized', {
       description: 'All optimizations have been applied',
     })
@@ -177,76 +224,222 @@ export function SvgPostProcessingPanel({
 
         <Separator />
 
-        {/* Quick Actions */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Quick Actions</p>
-          
-          <div className="grid grid-cols-2 gap-2">
+        {/* Background Section - Most common operation */}
+        <Collapsible defaultOpen>
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 text-sm font-semibold hover:text-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <Eraser weight="bold" className="w-4 h-4 text-red-500" />
+              Background
+            </div>
+            <CaretDown className="w-4 h-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 space-y-2">
             <Button
               variant="outline"
               size="sm"
-              className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
-              onClick={handleRemoveColorBlocks}
+              className="w-full h-auto py-2.5 justify-start gap-2"
+              onClick={handleRemoveBackground}
               disabled={isProcessing}
             >
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Palette className="w-3.5 h-3.5 text-purple-500" weight="fill" />
-                Merge Colors
+              <Eraser className="w-4 h-4 text-red-500" weight="fill" />
+              <div className="text-left">
+                <div className="text-xs font-medium">Remove Background</div>
+                <div className="text-[10px] text-muted-foreground">
+                  Remove white/light background for transparency
+                </div>
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Reduce color blocks
-              </p>
             </Button>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Separator />
+
+        {/* Border Section */}
+        <Collapsible defaultOpen>
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 text-sm font-semibold hover:text-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <FrameCorners weight="bold" className="w-4 h-4 text-blue-500" />
+              Add Border
+            </div>
+            <CaretDown className="w-4 h-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 space-y-3">
+            {/* Border Type Selection */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={borderType === 'rounded' ? 'default' : 'outline'}
+                size="sm"
+                className="h-auto py-2 gap-1.5"
+                onClick={() => setBorderType('rounded')}
+              >
+                <RectangleDashed className="w-4 h-4" weight="bold" />
+                <span className="text-xs">Rounded</span>
+              </Button>
+              <Button
+                variant={borderType === 'circle' ? 'default' : 'outline'}
+                size="sm"
+                className="h-auto py-2 gap-1.5"
+                onClick={() => setBorderType('circle')}
+              >
+                <Circle className="w-4 h-4" weight="bold" />
+                <span className="text-xs">Circle</span>
+              </Button>
+            </div>
+
+            {/* Border Color */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Color</Label>
+              <Select value={borderColor} onValueChange={setBorderColor}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-sm border border-border" 
+                        style={{ backgroundColor: borderColor }}
+                      />
+                      {BORDER_COLORS.find(c => c.value === borderColor)?.label || borderColor}
+                    </div>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {BORDER_COLORS.map((color) => (
+                    <SelectItem key={color.value} value={color.value}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-sm border border-border" 
+                          style={{ backgroundColor: color.value }}
+                        />
+                        {color.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Border Width */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Label className="text-xs">Stroke Width</Label>
+                <span className="text-xs text-muted-foreground">{borderWidth}px</span>
+              </div>
+              <Slider
+                value={[borderWidth]}
+                onValueChange={([v]) => setBorderWidth(v)}
+                min={1}
+                max={10}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+
+            {/* Border Padding */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Label className="text-xs">Padding</Label>
+                <span className="text-xs text-muted-foreground">{borderPadding}px</span>
+              </div>
+              <Slider
+                value={[borderPadding]}
+                onValueChange={([v]) => setBorderPadding(v)}
+                min={0}
+                max={50}
+                step={5}
+                className="cursor-pointer"
+              />
+            </div>
 
             <Button
-              variant="outline"
+              className="w-full gap-2"
               size="sm"
-              className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
-              onClick={handleSimplifyPaths}
+              onClick={handleAddBorder}
               disabled={isProcessing}
             >
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Path className="w-3.5 h-3.5 text-cyan" weight="fill" />
-                Simplify Paths
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Reduce precision
-              </p>
+              <FrameCorners className="w-4 h-4" weight="fill" />
+              Apply Border
             </Button>
+          </CollapsibleContent>
+        </Collapsible>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
-              onClick={handleOptimizeGroups}
-              disabled={isProcessing}
-            >
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Stack className="w-3.5 h-3.5 text-orange" weight="fill" />
-                Optimize Groups
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Flatten nesting
-              </p>
-            </Button>
+        <Separator />
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
-              onClick={handleRemoveEmptyElements}
-              disabled={isProcessing || !svgInfo?.hasEmptyElements}
-            >
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Trash className="w-3.5 h-3.5 text-destructive" weight="fill" />
-                Remove Empty
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Clean up SVG
-              </p>
-            </Button>
-          </div>
-        </div>
+        {/* Optimization Section */}
+        <Collapsible>
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 text-sm font-semibold hover:text-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <MagicWand weight="bold" className="w-4 h-4 text-orange" />
+              Optimization
+            </div>
+            <CaretDown className="w-4 h-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
+                onClick={handleRemoveColorBlocks}
+                disabled={isProcessing}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <Palette className="w-3.5 h-3.5 text-purple-500" weight="fill" />
+                  Merge Colors
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Reduce color blocks
+                </p>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
+                onClick={handleSimplifyPaths}
+                disabled={isProcessing}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <Path className="w-3.5 h-3.5 text-cyan" weight="fill" />
+                  Simplify Paths
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Reduce precision
+                </p>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
+                onClick={handleOptimizeGroups}
+                disabled={isProcessing}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <Stack className="w-3.5 h-3.5 text-orange" weight="fill" />
+                  Optimize Groups
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Flatten nesting
+                </p>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto py-2 px-3 flex-col items-start text-left gap-1"
+                onClick={handleRemoveEmptyElements}
+                disabled={isProcessing || !svgInfo?.hasEmptyElements}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <Trash className="w-3.5 h-3.5 text-destructive" weight="fill" />
+                  Remove Empty
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Clean up SVG
+                </p>
+              </Button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         <Separator />
 
@@ -265,7 +458,7 @@ export function SvgPostProcessingPanel({
         </Button>
 
         <p className="text-[10px] text-muted-foreground text-center">
-          Applies all optimizations at once
+          Removes background and applies all optimizations
         </p>
       </CardContent>
     </Card>
