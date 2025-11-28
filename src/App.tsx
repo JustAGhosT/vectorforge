@@ -19,6 +19,7 @@ import {
   Activity,
   ChatCircle,
   SidebarSimple,
+  MagicWand,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { ConversionJob } from '@/lib/converter'
@@ -57,6 +58,7 @@ const ConversionHistory = lazy(() => import('@/components/ConversionHistory').th
 const FormatGuide = lazy(() => import('@/components/FormatGuide').then(m => ({ default: m.FormatGuide })))
 const MultiFormatConverter = lazy(() => import('@/components/MultiFormatConverter').then(m => ({ default: m.MultiFormatConverter })))
 const IterativeConverter = lazy(() => import('@/components/IterativeConverter').then(m => ({ default: m.IterativeConverter })))
+const RemixPage = lazy(() => import('@/components/RemixPage').then(m => ({ default: m.RemixPage })))
 
 // Loading fallback component
 function LoadingFallback() {
@@ -82,6 +84,7 @@ function App() {
   const [showErrorLog, setShowErrorLog] = useState(false)
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [rightPanelTab, setRightPanelTab] = useState<'activity' | 'chat' | 'postprocess'>('activity')
+  const [activeMainTab, setActiveMainTab] = useState('convert')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentSvgContent, setCurrentSvgContent] = useState<string | null>(null)
 
@@ -758,11 +761,16 @@ function App() {
             <div className="flex gap-6">
               {/* Main content area */}
               <div className={showRightPanel && !isMobile ? 'flex-1' : 'w-full'}>
-            <Tabs defaultValue="convert" className="w-full">
-              <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-5">
+            <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+              {/* Note: grid-cols-6 matches the 6 tabs: Convert, Remix, AI Iterative, Batch, Formats, History */}
+              <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-6">
                 <TabsTrigger value="convert" className="gap-2">
                   <UploadSimple weight="bold" className="w-4 h-4" />
                   <span className="hidden sm:inline">Convert</span>
+                </TabsTrigger>
+                <TabsTrigger value="remix" className="gap-2">
+                  <MagicWand weight="bold" className="w-4 h-4" />
+                  <span className="hidden sm:inline">Remix</span>
                 </TabsTrigger>
                 <TabsTrigger value="iterative" className="gap-2">
                   <Robot weight="bold" className="w-4 h-4" />
@@ -809,6 +817,7 @@ function App() {
                   onRetry={handleReconvertAndSave}
                   showCheckerboard={preferences.showCheckerboard}
                   onToggleCheckerboard={() => updatePreference('showCheckerboard', !preferences.showCheckerboard)}
+                  onRemix={() => setActiveMainTab('remix')}
                 />
               </div>
 
@@ -858,6 +867,18 @@ function App() {
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="remix" className="space-y-4 md:space-y-6">
+            <Suspense fallback={<LoadingFallback />}>
+              <RemixPage
+                svgContent={currentSvgContent}
+                pngDataUrl={currentJob?.pngDataUrl || null}
+                onApplyChanges={handleApplySvgChange}
+                onDownload={() => currentJob && handleDownload(currentJob)}
+                comparison={comparison}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="iterative" className="space-y-4 md:space-y-6">
