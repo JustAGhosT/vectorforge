@@ -238,7 +238,7 @@ Provide 3-6 suggestions. Return only valid JSON.`
 
     // Add to history
     const historyItem: RemixHistoryItem = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       svgContent: result,
       timestamp: Date.now(),
       transformationName,

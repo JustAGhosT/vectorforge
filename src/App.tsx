@@ -762,6 +762,7 @@ function App() {
               {/* Main content area */}
               <div className={showRightPanel && !isMobile ? 'flex-1' : 'w-full'}>
             <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+              {/* Note: grid-cols-6 matches the 6 tabs: Convert, Remix, AI Iterative, Batch, Formats, History */}
               <TabsList className="mb-4 md:mb-6 w-full md:w-auto grid grid-cols-6">
                 <TabsTrigger value="convert" className="gap-2">
                   <UploadSimple weight="bold" className="w-4 h-4" />

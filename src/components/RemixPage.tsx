@@ -234,7 +234,7 @@ export function RemixPage({
 
   if (!svgContent) {
     return (
-      <Card className={cn('', className)}>
+      <Card className={className}>
         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
           <MagicWand className="w-12 h-12 text-muted-foreground/50 mb-4" weight="light" />
           <h3 className="text-lg font-semibold mb-2">No SVG to Remix</h3>

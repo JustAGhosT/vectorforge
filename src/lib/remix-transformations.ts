@@ -44,7 +44,8 @@ export interface TransformOptions {
 function getSvgDimensions(svg: string): { width: number; height: number; viewBox: string } | null {
   const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/)
   if (viewBoxMatch) {
-    const [, , w, h] = viewBoxMatch[1].split(/\s+/).map(Number)
+    // viewBox format is "minX minY width height"
+    const [minX, minY, w, h] = viewBoxMatch[1].split(/\s+/).map(Number)
     return { width: w, height: h, viewBox: viewBoxMatch[1] }
   }
   
@@ -110,12 +111,13 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
   const { remove = false, color, opacity = 1 } = options
   
   if (remove) {
-    // Remove any background rectangles that cover the full SVG
+    // Remove any background rectangles that cover the full SVG (100% width/height)
     let result = svg.replace(/<rect[^>]*fill=["'][^"']*["'][^>]*width=["']100%["'][^>]*height=["']100%["'][^>]*\/?>/gi, '')
-    // Also remove any rectangles at position 0,0 that might be backgrounds
+    // Also remove rectangles at position 0,0 that have 100% dimensions (likely backgrounds)
     result = result.replace(/<rect[^>]*(?:x=["']0["'][^>]*y=["']0["']|y=["']0["'][^>]*x=["']0["'])[^>]*\/?>/gi, (match) => {
-      // Check if it's likely a background (no transform, large size)
-      if (!match.includes('transform') && (match.includes('width="100%"') || match.includes('fill'))) {
+      // Only remove if it has 100% dimensions (indicating it's a full-size background)
+      // Don't remove based on fill attribute alone as that could remove foreground elements
+      if (!match.includes('transform') && (match.includes('width="100%"') || match.includes('height="100%"'))) {
         return ''
       }
       return match
