@@ -9,6 +9,7 @@ import {
   MagnifyingGlassMinus,
   ArrowClockwise,
   Checks,
+  MagicWand,
 } from '@phosphor-icons/react'
 import { ConversionJob, formatFileSize } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -32,6 +33,7 @@ interface ConversionPreviewProps {
   onRetry?: () => void
   showCheckerboard?: boolean
   onToggleCheckerboard?: () => void
+  onRemix?: () => void
 }
 
 export function ConversionPreview({
@@ -48,6 +50,7 @@ export function ConversionPreview({
   onRetry,
   showCheckerboard = false,
   onToggleCheckerboard,
+  onRemix,
 }: ConversionPreviewProps) {
   const isMobile = useIsMobile()
   const previewRef = useRef<HTMLDivElement>(null)
@@ -260,6 +263,17 @@ export function ConversionPreview({
               <DownloadSimple weight="bold" />
               Download SVG
             </Button>
+            {onRemix && (
+              <Button
+                variant="outline"
+                onClick={onRemix}
+                className="gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98] border-primary/50 text-primary hover:bg-primary/10"
+                title="Open Remix Studio for AI-powered improvements"
+              >
+                <MagicWand weight="bold" />
+                Remix
+              </Button>
+            )}
             {onRetry && (
               <Button
                 variant="outline"
