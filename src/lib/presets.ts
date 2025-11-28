@@ -174,7 +174,15 @@ export function loadCustomPresets(): ConversionPreset[] {
 export function saveCustomPreset(name: string, settings: ConversionSettings): ConversionPreset {
   const customPresets = loadCustomPresets()
   const colorModeLabel = settings.colorMode === 'blackAndWhite' ? 'B&W' : 'Color'
-  const curveModeLabel = settings.curveFitting === 'polygon' ? 'Poly' : settings.curveFitting === 'pixel' ? 'Pix' : 'Spln'
+  
+  // Map curve fitting mode to short label
+  const curveModeLabels: Record<string, string> = {
+    polygon: 'Poly',
+    pixel: 'Pix',
+    spline: 'Spln',
+  }
+  const curveModeLabel = curveModeLabels[settings.curveFitting ?? 'spline'] ?? 'Spln'
+  
   const newPreset: ConversionPreset = {
     id: `custom-${Date.now()}`,
     name,
@@ -264,6 +272,14 @@ export function importPresetsFromJSON(jsonString: string): { imported: number; e
         ? `custom-${crypto.randomUUID()}`
         : `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
       
+      // Valid curve fitting modes
+      const validCurveFittingModes = ['spline', 'polygon', 'pixel'] as const
+      type CurveFittingMode = typeof validCurveFittingModes[number]
+      
+      const isCurveFittingMode = (value: unknown): value is CurveFittingMode => {
+        return typeof value === 'string' && validCurveFittingModes.includes(value as CurveFittingMode)
+      }
+      
       // Generate new ID to avoid conflicts
       const newPreset: ConversionPreset = {
         id: uniqueId,
@@ -277,7 +293,7 @@ export function importPresetsFromJSON(jsonString: string): { imported: number; e
           usePotrace: Boolean(preset.settings.usePotrace),
           colorMode: preset.settings.colorMode === 'blackAndWhite' ? 'blackAndWhite' : 'colored',
           filterSpeckle: Math.max(0, Math.min(50, preset.settings.filterSpeckle ?? 0)),
-          curveFitting: ['spline', 'polygon', 'pixel'].includes(preset.settings.curveFitting) 
+          curveFitting: isCurveFittingMode(preset.settings.curveFitting) 
             ? preset.settings.curveFitting 
             : 'spline',
           cornerThreshold: Math.max(0, Math.min(180, preset.settings.cornerThreshold ?? 90)),

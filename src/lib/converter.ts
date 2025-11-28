@@ -128,6 +128,9 @@ export async function convertImageToSvg(
   })
 }
 
+// Simplification tolerance for polygon mode
+const POLYGON_SIMPLIFICATION_TOLERANCE = 2
+
 function generateSvgFromImageData(
   imageData: ImageData,
   settings: ConversionSettings
@@ -140,7 +143,6 @@ function generateSvgFromImageData(
     colorMode = 'colored',
     filterSpeckle = 0,
     curveFitting = 'spline',
-    cornerThreshold = 90
   } = settings
 
   // For black and white mode, use only 2 colors
@@ -165,7 +167,7 @@ function generateSvgFromImageData(
   const paths: string[] = []
 
   colorLayers.forEach(({ color, pixels }) => {
-    const contours = traceContours(pixels, width, height, detailThreshold, cornerThreshold)
+    const contours = traceContours(pixels, width, height, detailThreshold)
     
     contours.forEach(contour => {
       if (contour.length < 3) return
@@ -177,7 +179,7 @@ function generateSvgFromImageData(
         processedContour = applyCatmullRomSpline(contour, smoothness)
       } else if (curveFitting === 'polygon') {
         // For polygon mode, simplify but don't smooth
-        processedContour = simplifyContour(contour, 2)
+        processedContour = simplifyContour(contour, POLYGON_SIMPLIFICATION_TOLERANCE)
       }
       // For 'pixel' mode, use original contour
       
@@ -305,8 +307,7 @@ function traceContours(
   pixels: boolean[],
   width: number,
   height: number,
-  minSize: number,
-  cornerThreshold: number = 90
+  minSize: number
 ): Point[][] {
   const visited = new Array(pixels.length).fill(false)
   const contours: Point[][] = []

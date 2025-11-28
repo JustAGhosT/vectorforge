@@ -13,7 +13,6 @@ import { ConversionSettings } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { PresetSelector } from '@/components/PresetSelector'
 import type { ConversionPreset } from '@/lib/presets'
-import { useState } from 'react'
 
 interface SettingsPanelProps {
   settings: ConversionSettings
@@ -49,7 +48,6 @@ export function SettingsPanel({
   onEnableAIIterativeChange,
 }: SettingsPanelProps) {
   const isMobile = useIsMobile()
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Helper component for settings with tooltips
   const SettingLabel = ({ label, tooltip }: { label: string; tooltip: string }) => (
@@ -259,13 +257,13 @@ export function SettingsPanel({
       <Separator />
 
       {/* Advanced Section */}
-      <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+      <Collapsible>
         <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-semibold hover:text-primary transition-colors">
           <div className="flex items-center gap-2">
             <Funnel weight="bold" className="w-4 h-4 text-primary" />
             Advanced
           </div>
-          <CaretDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          <CaretDown className="w-4 h-4" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4 pt-3">
           {/* Corner Threshold */}
