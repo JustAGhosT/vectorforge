@@ -27,8 +27,8 @@ describe('Presets', () => {
   })
 
   describe('BUILT_IN_PRESETS', () => {
-    it('should have 5 built-in presets', () => {
-      expect(BUILT_IN_PRESETS).toHaveLength(5)
+    it('should have 7 built-in presets', () => {
+      expect(BUILT_IN_PRESETS).toHaveLength(7)
     })
 
     it('should have all required preset types', () => {
@@ -38,6 +38,8 @@ describe('Presets', () => {
       expect(ids).toContain('illustration')
       expect(ids).toContain('photo')
       expect(ids).toContain('minimal')
+      expect(ids).toContain('bw-logo')
+      expect(ids).toContain('pixel-art')
     })
 
     it('should have valid settings for each preset', () => {

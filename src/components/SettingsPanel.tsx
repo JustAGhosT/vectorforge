@@ -5,15 +5,19 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning, Robot } from '@phosphor-icons/react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { SlidersHorizontal, ArrowCounterClockwise, Sparkle, Lightning, Robot, Palette, CaretDown, BezierCurve, Funnel, Info } from '@phosphor-icons/react'
 import { ConversionSettings } from '@/lib/converter'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { PresetSelector } from '@/components/PresetSelector'
 import type { ConversionPreset } from '@/lib/presets'
+import { useState } from 'react'
 
 interface SettingsPanelProps {
   settings: ConversionSettings
-  onSettingChange: (key: keyof ConversionSettings, value: number | boolean) => void
+  onSettingChange: (key: keyof ConversionSettings, value: number | boolean | string) => void
   onApplyPreset?: (preset: ConversionPreset) => void
   onReconvert?: () => void
   canReconvert: boolean
@@ -45,6 +49,24 @@ export function SettingsPanel({
   onEnableAIIterativeChange,
 }: SettingsPanelProps) {
   const isMobile = useIsMobile()
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  // Helper component for settings with tooltips
+  const SettingLabel = ({ label, tooltip }: { label: string; tooltip: string }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1.5 cursor-help">
+            <label className="text-sm font-medium">{label}</label>
+            <Info className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="text-xs">{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 
   const SettingsContent = () => (
     <div className="space-y-6">
@@ -74,109 +96,249 @@ export function SettingsPanel({
           <Separator />
         </>
       )}
-      
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Complexity</label>
-          <span className="text-xs text-muted-foreground">
-            {Math.round(settings.complexity * 100)}%
-          </span>
-        </div>
-        <Slider
-          value={[settings.complexity]}
-          onValueChange={([value]) => onSettingChange('complexity', value)}
-          min={0}
-          max={1}
-          step={0.1}
-          className="cursor-pointer"
-        />
-        <p className="text-xs text-muted-foreground">
-          Higher values preserve more details
-        </p>
-      </div>
 
-      <Separator />
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Color Simplification</label>
-          <span className="text-xs text-muted-foreground">
-            {Math.round(settings.colorSimplification * 100)}%
-          </span>
-        </div>
-        <Slider
-          value={[settings.colorSimplification]}
-          onValueChange={([value]) => onSettingChange('colorSimplification', value)}
-          min={0}
-          max={1}
-          step={0.1}
-          className="cursor-pointer"
-        />
-        <p className="text-xs text-muted-foreground">
-          Reduce color palette for smaller files
-        </p>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Path Smoothing</label>
-          <span className="text-xs text-muted-foreground">
-            {Math.round(settings.pathSmoothing * 100)}%
-          </span>
-        </div>
-        <Slider
-          value={[settings.pathSmoothing]}
-          onValueChange={([value]) => onSettingChange('pathSmoothing', value)}
-          min={0}
-          max={1}
-          step={0.1}
-          className="cursor-pointer"
-        />
-        <p className="text-xs text-muted-foreground">
-          Smooth edges for cleaner appearance
-        </p>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Image Options Section */}
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-semibold hover:text-primary transition-colors">
           <div className="flex items-center gap-2">
-            <Lightning weight="fill" className="w-4 h-4 text-orange" />
-            <label className="text-sm font-medium">Potrace Engine</label>
+            <Palette weight="bold" className="w-4 h-4 text-primary" />
+            Image Options
           </div>
-          <Switch
-            checked={settings.usePotrace ?? false}
-            onCheckedChange={(checked) => onSettingChange('usePotrace', checked)}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Professional-grade tracing with WASM acceleration
-        </p>
-      </div>
-
-      {onEnableAIIterativeChange && (
-        <>
-          <Separator />
-          <div className="space-y-3">
+          <CaretDown className="w-4 h-4" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
+          {/* Color Mode */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Robot weight="fill" className="w-4 h-4 text-purple-500" />
-                <label className="text-sm font-medium">AI Iterative Refinement</label>
-              </div>
-              <Switch
-                checked={enableAIIterative}
-                onCheckedChange={onEnableAIIterativeChange}
+              <SettingLabel 
+                label="Color Mode" 
+                tooltip="Choose between full color output or black & white. B&W is ideal for logos, signatures, and line art."
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Use AI to automatically improve conversion quality through multiple iterations
-            </p>
+            <Select
+              value={settings.colorMode ?? 'colored'}
+              onValueChange={(value) => onSettingChange('colorMode', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select color mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="colored">Colored</SelectItem>
+                <SelectItem value="blackAndWhite">Black & White</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </>
-      )}
+
+          {/* Color Simplification - only show when colored mode */}
+          {(settings.colorMode ?? 'colored') === 'colored' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <SettingLabel 
+                  label="Color Simplification" 
+                  tooltip="Reduces the number of colors in the output. Higher values = fewer colors, smaller files. Recommended: 60-80% for logos, 20-40% for detailed art."
+                />
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(settings.colorSimplification * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[settings.colorSimplification]}
+                onValueChange={([value]) => onSettingChange('colorSimplification', value)}
+                min={0}
+                max={1}
+                step={0.1}
+                className="cursor-pointer"
+              />
+            </div>
+          )}
+
+          {/* Filter Speckle */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <SettingLabel 
+                label="Filter Speckle" 
+                tooltip="Removes small noise patches smaller than this size. Useful for cleaning up scanned images or photos. Higher values remove more small details."
+              />
+              <span className="text-xs text-muted-foreground">
+                {settings.filterSpeckle ?? 0}px
+              </span>
+            </div>
+            <Slider
+              value={[settings.filterSpeckle ?? 0]}
+              onValueChange={([value]) => onSettingChange('filterSpeckle', value)}
+              min={0}
+              max={50}
+              step={1}
+              className="cursor-pointer"
+            />
+          </div>
+
+          {/* Complexity */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <SettingLabel 
+                label="Complexity" 
+                tooltip="Controls how much detail is preserved. Higher values capture more fine details but may increase file size. Lower values create simpler, cleaner shapes."
+              />
+              <span className="text-xs text-muted-foreground">
+                {Math.round(settings.complexity * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[settings.complexity]}
+              onValueChange={([value]) => onSettingChange('complexity', value)}
+              min={0}
+              max={1}
+              step={0.1}
+              className="cursor-pointer"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Separator />
+
+      {/* Curve Fitting Section */}
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-semibold hover:text-primary transition-colors">
+          <div className="flex items-center gap-2">
+            <BezierCurve weight="bold" className="w-4 h-4 text-primary" />
+            Curve Fitting
+          </div>
+          <CaretDown className="w-4 h-4" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
+          {/* Curve Fitting Mode */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <SettingLabel 
+                label="Curve Mode" 
+                tooltip="Spline creates smooth curves (best for organic shapes). Polygon creates straight-edged shapes (best for geometric designs). Pixel preserves original pixel edges."
+              />
+            </div>
+            <Select
+              value={settings.curveFitting ?? 'spline'}
+              onValueChange={(value) => onSettingChange('curveFitting', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select curve mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="spline">Spline (Smooth curves)</SelectItem>
+                <SelectItem value="polygon">Polygon (Straight edges)</SelectItem>
+                <SelectItem value="pixel">Pixel (Preserve edges)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Path Smoothing - only relevant for spline mode */}
+          {(settings.curveFitting ?? 'spline') === 'spline' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <SettingLabel 
+                  label="Path Smoothing" 
+                  tooltip="Controls how smooth the curves are. Higher values create smoother, more flowing lines. Lower values stay closer to the original shape."
+                />
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(settings.pathSmoothing * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[settings.pathSmoothing]}
+                onValueChange={([value]) => onSettingChange('pathSmoothing', value)}
+                min={0}
+                max={1}
+                step={0.1}
+                className="cursor-pointer"
+              />
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Separator />
+
+      {/* Advanced Section */}
+      <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+        <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-semibold hover:text-primary transition-colors">
+          <div className="flex items-center gap-2">
+            <Funnel weight="bold" className="w-4 h-4 text-primary" />
+            Advanced
+          </div>
+          <CaretDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
+          {/* Corner Threshold */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <SettingLabel 
+                label="Corner Threshold" 
+                tooltip="Angle threshold for detecting corners. Lower values detect more corners (sharper result). Higher values smooth more corners into curves."
+              />
+              <span className="text-xs text-muted-foreground">
+                {settings.cornerThreshold ?? 90}°
+              </span>
+            </div>
+            <Slider
+              value={[settings.cornerThreshold ?? 90]}
+              onValueChange={([value]) => onSettingChange('cornerThreshold', value)}
+              min={0}
+              max={180}
+              step={5}
+              className="cursor-pointer"
+            />
+          </div>
+
+          {/* Potrace Engine */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 cursor-help">
+                      <Lightning weight="fill" className="w-4 h-4 text-orange" />
+                      <label className="text-sm font-medium">Potrace Engine</label>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">Professional-grade tracing algorithm with WASM acceleration. Produces higher quality results for most images.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Switch
+                checked={settings.usePotrace ?? false}
+                onCheckedChange={(checked) => onSettingChange('usePotrace', checked)}
+              />
+            </div>
+          </div>
+
+          {onEnableAIIterativeChange && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2 cursor-help">
+                        <Robot weight="fill" className="w-4 h-4 text-purple-500" />
+                        <label className="text-sm font-medium">AI Iterative Refinement</label>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">Use AI to automatically improve conversion quality through multiple iterations. Finds the optimal settings for your image.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Switch
+                  checked={enableAIIterative}
+                  onCheckedChange={onEnableAIIterativeChange}
+                />
+              </div>
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       {canReconvert && onReconvert && (
         <>

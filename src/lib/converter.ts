@@ -3,6 +3,10 @@ export interface ConversionSettings {
   colorSimplification: number
   pathSmoothing: number
   usePotrace?: boolean // Use professional Potrace algorithm (WASM-accelerated)
+  colorMode?: 'colored' | 'blackAndWhite' // Color mode for output
+  filterSpeckle?: number // Minimum patch size in pixels to keep (0-50, filters noise)
+  curveFitting?: 'spline' | 'polygon' | 'pixel' // Curve fitting mode
+  cornerThreshold?: number // Angle threshold for corner detection (0-180 degrees)
 }
 
 export interface ConversionJob {
@@ -129,27 +133,55 @@ function generateSvgFromImageData(
   settings: ConversionSettings
 ): string {
   const { width, height, data } = imageData
-  const { complexity, colorSimplification, pathSmoothing } = settings
+  const { 
+    complexity, 
+    colorSimplification, 
+    pathSmoothing,
+    colorMode = 'colored',
+    filterSpeckle = 0,
+    curveFitting = 'spline',
+    cornerThreshold = 90
+  } = settings
 
-  const colorCount = Math.max(4, Math.floor(256 - (colorSimplification * 240)))
-  const detailThreshold = Math.max(2, Math.floor(50 - (complexity * 45)))
-  const smoothness = pathSmoothing
+  // For black and white mode, use only 2 colors
+  const colorCount = colorMode === 'blackAndWhite' 
+    ? 2 
+    : Math.max(4, Math.floor(256 - (colorSimplification * 240)))
+  
+  // Combine detail threshold with speckle filter
+  const detailThreshold = Math.max(
+    2, 
+    Math.floor(50 - (complexity * 45)),
+    filterSpeckle
+  )
+  
+  const smoothness = curveFitting === 'pixel' ? 0 : pathSmoothing
 
-  const quantizedData = quantizeColors(data, colorCount)
+  const quantizedData = colorMode === 'blackAndWhite'
+    ? quantizeToBlackAndWhite(data)
+    : quantizeColors(data, colorCount)
+  
   const colorLayers = extractColorLayers(quantizedData, width, height)
   const paths: string[] = []
 
   colorLayers.forEach(({ color, pixels }) => {
-    const contours = traceContours(pixels, width, height, detailThreshold)
+    const contours = traceContours(pixels, width, height, detailThreshold, cornerThreshold)
     
     contours.forEach(contour => {
       if (contour.length < 3) return
       
-      const smoothedContour = smoothness > 0.3 
-        ? applyCatmullRomSpline(contour, smoothness)
-        : contour
+      let processedContour = contour
       
-      const pathData = contourToPath(smoothedContour, smoothness)
+      // Apply different curve fitting based on mode
+      if (curveFitting === 'spline' && smoothness > 0.3) {
+        processedContour = applyCatmullRomSpline(contour, smoothness)
+      } else if (curveFitting === 'polygon') {
+        // For polygon mode, simplify but don't smooth
+        processedContour = simplifyContour(contour, 2)
+      }
+      // For 'pixel' mode, use original contour
+      
+      const pathData = contourToPath(processedContour, curveFitting === 'spline' ? smoothness : 0)
       if (pathData) {
         paths.push(`<path d="${pathData}" fill="${color}" />`)
       }
@@ -160,6 +192,36 @@ function generateSvgFromImageData(
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
   ${paths.join('\n  ')}
 </svg>`
+}
+
+/**
+ * Convert image data to black and white
+ * Uses luminance-based thresholding for natural results
+ */
+function quantizeToBlackAndWhite(data: Uint8ClampedArray): Uint8ClampedArray {
+  const quantized = new Uint8ClampedArray(data.length)
+  const threshold = 128 // Standard threshold
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    
+    if (a < 10) {
+      quantized[i] = quantized[i + 1] = quantized[i + 2] = 255
+      quantized[i + 3] = 0
+      continue
+    }
+
+    // Calculate luminance using standard weights
+    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+    const bwValue = luminance > threshold ? 255 : 0
+    
+    quantized[i] = bwValue
+    quantized[i + 1] = bwValue
+    quantized[i + 2] = bwValue
+    quantized[i + 3] = 255
+  }
+
+  return quantized
 }
 
 function quantizeColors(data: Uint8ClampedArray, levels: number): Uint8ClampedArray {
@@ -243,7 +305,8 @@ function traceContours(
   pixels: boolean[],
   width: number,
   height: number,
-  minSize: number
+  minSize: number,
+  cornerThreshold: number = 90
 ): Point[][] {
   const visited = new Array(pixels.length).fill(false)
   const contours: Point[][] = []
