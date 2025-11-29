@@ -96,7 +96,7 @@ function App() {
   const { entries: activityEntries, addEntry: addActivityEntry, updateEntry: updateActivityEntry, clearEntries: clearActivityEntries } = useActivityLog()
 
   // Helper function to add activity log entries
-  const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error', details?: Record<string, unknown>) => {
+  const logActivity = useCallback((title: string, description: string, type: 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'remix' | 'settings' | 'download' | 'error' | 'system' = 'system', status?: 'pending' | 'success' | 'error', details?: Record<string, unknown>) => {
     return addActivityEntry({ title, description, type, status, details })
   }, [addActivityEntry])
 
@@ -876,6 +876,7 @@ function App() {
                 pngDataUrl={currentJob?.pngDataUrl || null}
                 onApplyChanges={handleApplySvgChange}
                 onDownload={() => currentJob && handleDownload(currentJob)}
+                onActivityLog={(title, desc) => logActivity(title, desc, 'remix', 'success')}
                 comparison={comparison}
               />
             </Suspense>
