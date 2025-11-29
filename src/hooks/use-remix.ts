@@ -157,13 +157,13 @@ Provide 3-6 suggestions. Return only valid JSON.`
   }, [])
 
   /**
-   * Apply a transformation and add to history
+   * Get transformed SVG without updating state (for preview)
    */
-  const applyTransformation = useCallback((
+  const getTransformedSvg = useCallback((
     svgContent: string,
     transformationId: string,
     options?: Record<string, unknown>
-  ): string => {
+  ): { result: string; name: string } => {
     let result = svgContent
     let transformationName = transformationId
 
@@ -236,6 +236,19 @@ Provide 3-6 suggestions. Return only valid JSON.`
         console.warn(`Unknown transformation: ${transformationId}`)
     }
 
+    return { result, name: transformationName }
+  }, [])
+
+  /**
+   * Apply a transformation and add to history
+   */
+  const applyTransformation = useCallback((
+    svgContent: string,
+    transformationId: string,
+    options?: Record<string, unknown>
+  ): string => {
+    const { result, name: transformationName } = getTransformedSvg(svgContent, transformationId, options)
+
     // Add to history
     const historyItem: RemixHistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -247,7 +260,7 @@ Provide 3-6 suggestions. Return only valid JSON.`
     setCurrentSvg(result)
 
     return result
-  }, [])
+  }, [getTransformedSvg])
 
   /**
    * Restore from history
@@ -278,6 +291,7 @@ Provide 3-6 suggestions. Return only valid JSON.`
     currentSvg,
     setCurrentSvg,
     analyzeWithAI,
+    getTransformedSvg,
     applyTransformation,
     restoreFromHistory,
     clearHistory,

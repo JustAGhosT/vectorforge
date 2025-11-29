@@ -17,6 +17,7 @@ import {
   ChatCircle,
   Robot,
   Info,
+  MagicWand,
 } from '@phosphor-icons/react'
 import type { ActivityLogEntry, ActivityType } from '@/hooks/use-activity-log'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -35,6 +36,7 @@ const activityIcons: Record<ActivityType, typeof Activity> = {
   'ai-suggestion': Robot,
   'ai-iteration': ArrowsClockwise,
   'ai-chat': ChatCircle,
+  remix: MagicWand,
   settings: Gear,
   download: DownloadSimple,
   error: WarningCircle,
@@ -48,6 +50,7 @@ const activityColors: Record<ActivityType, string> = {
   'ai-suggestion': 'text-violet-500',
   'ai-iteration': 'text-indigo-500',
   'ai-chat': 'text-green-500',
+  remix: 'text-pink-500',
   settings: 'text-orange',
   download: 'text-emerald-500',
   error: 'text-destructive',

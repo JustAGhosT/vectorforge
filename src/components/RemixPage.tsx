@@ -51,6 +51,7 @@ interface RemixPageProps {
   pngDataUrl: string | null
   onApplyChanges: (newSvg: string) => void
   onDownload: () => void
+  onActivityLog?: (title: string, description: string) => void
   comparison?: ComparisonResult | null
   className?: string
 }
@@ -81,6 +82,7 @@ export function RemixPage({
   pngDataUrl,
   onApplyChanges,
   onDownload,
+  onActivityLog,
   comparison,
   className,
 }: RemixPageProps) {
@@ -91,6 +93,7 @@ export function RemixPage({
     currentSvg,
     setCurrentSvg,
     analyzeWithAI,
+    getTransformedSvg,
     applyTransformation,
     restoreFromHistory,
     clearHistory,
@@ -154,29 +157,36 @@ export function RemixPage({
       return
     }
 
+    // Get the transformation name for logging
+    const transformation = transformations.find(t => t.id === transformationId)
+    const transformName = transformation?.name || transformationId
+
     try {
       const result = applyTransformation(displaySvg, transformationId, options)
       setPreviewSvg(null)
       toast.success('Transformation applied!', {
         description: 'Your SVG has been updated',
       })
+      // Log the transformation to activity log
+      onActivityLog?.(transformName, `Applied ${transformName.toLowerCase()} transformation`)
     } catch (error) {
       toast.error('Transformation failed', {
         description: error instanceof Error ? error.message : 'Please try again',
       })
     }
-  }, [displaySvg, applyTransformation])
+  }, [displaySvg, applyTransformation, transformations, onActivityLog])
 
   const handlePreviewTransformation = useCallback((transformationId: string, options?: Record<string, unknown>) => {
     if (!displaySvg) return
-    
+
     try {
-      const result = applyTransformation(displaySvg, transformationId, options)
+      // Use getTransformedSvg for preview to avoid modifying state
+      const { result } = getTransformedSvg(displaySvg, transformationId, options)
       setPreviewSvg(result)
     } catch {
       // Silently fail preview
     }
-  }, [displaySvg, applyTransformation])
+  }, [displaySvg, getTransformedSvg])
 
   const handleCancelPreview = useCallback(() => {
     setPreviewSvg(null)

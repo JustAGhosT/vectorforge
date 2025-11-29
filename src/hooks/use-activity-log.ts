@@ -1,14 +1,15 @@
 import { useState, useCallback } from 'react'
 
-export type ActivityType = 
-  | 'upload' 
-  | 'conversion' 
-  | 'ai-analysis' 
-  | 'ai-suggestion' 
-  | 'ai-iteration' 
+export type ActivityType =
+  | 'upload'
+  | 'conversion'
+  | 'ai-analysis'
+  | 'ai-suggestion'
+  | 'ai-iteration'
   | 'ai-chat'
-  | 'settings' 
-  | 'download' 
+  | 'remix'
+  | 'settings'
+  | 'download'
   | 'error'
   | 'system'
 
