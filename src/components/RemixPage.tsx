@@ -164,11 +164,19 @@ export function RemixPage({
     try {
       const result = applyTransformation(displaySvg, transformationId, options)
       setPreviewSvg(null)
-      toast.success('Transformation applied!', {
-        description: 'Your SVG has been updated',
-      })
-      // Log the transformation to activity log
-      onActivityLog?.(transformName, `Applied ${transformName.toLowerCase()} transformation`)
+
+      // Check if the transformation actually changed anything
+      if (result === displaySvg) {
+        toast.info('No changes detected', {
+          description: `${transformName} had no effect on this SVG`,
+        })
+        onActivityLog?.(transformName, `No changes - SVG unchanged`)
+      } else {
+        toast.success('Transformation applied!', {
+          description: 'Your SVG has been updated',
+        })
+        onActivityLog?.(transformName, `Applied ${transformName.toLowerCase()} transformation`)
+      }
     } catch (error) {
       toast.error('Transformation failed', {
         description: error instanceof Error ? error.message : 'Please try again',
@@ -182,9 +190,13 @@ export function RemixPage({
     try {
       // Use getTransformedSvg for preview to avoid modifying state
       const { result } = getTransformedSvg(displaySvg, transformationId, options)
-      setPreviewSvg(result)
-    } catch {
-      // Silently fail preview
+      // Only show preview if something changed
+      if (result !== displaySvg) {
+        setPreviewSvg(result)
+      }
+    } catch (error) {
+      // Log preview failures for debugging but don't interrupt user
+      console.warn('Preview transformation failed:', error)
     }
   }, [displaySvg, getTransformedSvg])
 

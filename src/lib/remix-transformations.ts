@@ -387,14 +387,39 @@ export function convertToGrayscale(svg: string): string {
  * Invert all colors
  */
 export function invertColors(svg: string): string {
-  const hexRegex = /(fill|stroke)=["']#([0-9a-fA-F]{6})["']/gi
-  
-  return svg.replace(hexRegex, (match, attr, hex) => {
-    const r = 255 - parseInt(hex.slice(0, 2), 16)
-    const g = 255 - parseInt(hex.slice(2, 4), 16)
-    const b = 255 - parseInt(hex.slice(4, 6), 16)
-    
-    const newHex = [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')
+  // Match all color formats: 3-char hex, 6-char hex, rgb(), rgba()
+  const colorRegex = /(fill|stroke)=["'](#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|rgba\([^)]+\))["']/gi
+
+  return svg.replace(colorRegex, (match, attr, color) => {
+    let r = 0, g = 0, b = 0
+
+    if (color.startsWith('#')) {
+      // Hex color
+      const hex = color.slice(1)
+      if (hex.length === 3) {
+        r = parseInt(hex[0] + hex[0], 16)
+        g = parseInt(hex[1] + hex[1], 16)
+        b = parseInt(hex[2] + hex[2], 16)
+      } else {
+        r = parseInt(hex.slice(0, 2), 16)
+        g = parseInt(hex.slice(2, 4), 16)
+        b = parseInt(hex.slice(4, 6), 16)
+      }
+    } else if (color.startsWith('rgb')) {
+      const rgbMatch = color.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+      if (rgbMatch) {
+        r = parseInt(rgbMatch[1])
+        g = parseInt(rgbMatch[2])
+        b = parseInt(rgbMatch[3])
+      }
+    }
+
+    // Invert the color
+    const invR = 255 - r
+    const invG = 255 - g
+    const invB = 255 - b
+
+    const newHex = [invR, invG, invB].map(c => c.toString(16).padStart(2, '0')).join('')
     return `${attr}="#${newHex}"`
   })
 }
@@ -423,12 +448,18 @@ export function removeColor(svg: string, colorToRemove: string): string {
     }
     return color.toLowerCase()
   }
-  
+
+  // Escape special regex characters in the color string
+  const escapeRegex = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
   const targetColor = normalizeColor(colorToRemove)
-  
+  const escapedColor = escapeRegex(targetColor)
+
   // Remove elements with the specified fill color
   return svg.replace(
-    new RegExp(`<(path|rect|circle|polygon)[^>]*fill=["']${targetColor}["'][^>]*/?>`, 'gi'),
+    new RegExp(`<(path|rect|circle|polygon)[^>]*fill=["']${escapedColor}["'][^>]*/?>`, 'gi'),
     ''
   )
 }
