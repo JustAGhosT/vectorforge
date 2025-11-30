@@ -84,15 +84,26 @@ async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymen
 /**
  * Vite plugin to validate required Azure AI environment variables during production builds.
  * This ensures the build fails fast if the AI service is not properly configured.
+ * 
+ * Set SKIP_AZURE_VALIDATION=true to skip validation (AI features will be disabled at runtime).
  */
 function validateAzureEnvPlugin(): Plugin {
   return {
     name: 'validate-azure-env',
     async buildStart() {
-      // Only validate during production builds
+      // Allow skipping validation for deployments that don't need AI features
+      if (process.env.SKIP_AZURE_VALIDATION === 'true') {
+        console.log('⚠️  Azure AI validation skipped (SKIP_AZURE_VALIDATION=true)')
+        console.log('   AI features will be unavailable at runtime.')
+        return
+      }
+
+      // Only validate during production builds or CI
       if (process.env.NODE_ENV !== 'production' && !process.env.CI) {
         return
       }
+
+      console.log('🔍 Validating Azure AI configuration...')
 
       const requiredVars = [
         'AZURE_AI_ENDPOINT',
@@ -106,6 +117,7 @@ function validateAzureEnvPlugin(): Plugin {
         throw new Error(
           `Build failed: Missing required Azure AI environment variables: ${missing.join(', ')}.\n` +
           `Please set these in your environment or CI/CD pipeline.\n` +
+          `To build without AI features, set SKIP_AZURE_VALIDATION=true.\n` +
           `See docs/ENVIRONMENT_SETUP.md for details.`
         )
       }

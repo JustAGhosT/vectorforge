@@ -1,4 +1,13 @@
 # Netlify Configuration
+# 
+# Required Environment Variables for AI Features:
+#   - AZURE_AI_ENDPOINT: Your Azure OpenAI endpoint URL
+#   - AZURE_SECRET_KEY: Your Azure API key
+#   - AZURE_AI_DEPLOYMENT_NAME: Your model deployment name
+#
+# Optional: Set SKIP_AZURE_VALIDATION=true to build without AI features
+#
+# See docs/ENVIRONMENT_SETUP.md for detailed setup instructions.
 
 [build]
   command = "npm run build"

@@ -134,6 +134,45 @@ Click **"New repository secret"** and add these one by one:
 
 ---
 
+## 🌐 NETLIFY ENVIRONMENT VARIABLES SETUP
+
+If you're deploying VectorForge directly to Netlify (not via GitHub Actions):
+
+### Step 1: Go to your Netlify site settings
+
+1. Log in to [Netlify](https://app.netlify.com)
+2. Select your VectorForge site
+3. Click **Site configuration** (or **Site settings**)
+4. In the left sidebar, click **Environment variables**
+
+### Step 2: Add each environment variable
+
+Click **"Add a variable"** and add these one by one:
+
+| Key (copy exactly) | Value |
+|-------------------|-------|
+| `AZURE_AI_ENDPOINT` | Your endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+| `AZURE_SECRET_KEY` | Your API key |
+| `AZURE_AI_DEPLOYMENT_NAME` | Your deployment name (e.g., `gpt-4o`) |
+
+### Step 3: Redeploy your site
+
+After adding the environment variables:
+1. Go to **Deploys** in the top navigation
+2. Click **Trigger deploy** → **Deploy site**
+
+### Optional: Deploy Without AI Features
+
+If you don't need AI features, you can skip the Azure configuration by setting:
+
+| Key | Value |
+|-----|-------|
+| `SKIP_AZURE_VALIDATION` | `true` |
+
+This will allow the build to succeed without Azure credentials. AI features (like AI Optimize) will be unavailable at runtime.
+
+---
+
 ## ⚠️ COMMON MISTAKES (AND HOW TO FIX THEM)
 
 ### ❌ Mistake 1: Wrong file name
