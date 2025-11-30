@@ -15,8 +15,6 @@ function validateAzureEnvPlugin(): Plugin {
   return {
     name: 'validate-azure-env',
     buildStart() {
-      console.log('🔍 Validating Azure AI configuration...')
-
       // Allow skipping validation for deployments that don't need AI features
       if (process.env.SKIP_AZURE_VALIDATION === 'true') {
         console.log('⚠️  Azure AI validation skipped (SKIP_AZURE_VALIDATION=true)')
@@ -28,6 +26,8 @@ function validateAzureEnvPlugin(): Plugin {
       if (process.env.NODE_ENV !== 'production' && !process.env.CI) {
         return
       }
+
+      console.log('🔍 Validating Azure AI configuration...')
 
       const requiredVars = [
         'AZURE_AI_ENDPOINT',
