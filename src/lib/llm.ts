@@ -10,12 +10,12 @@ export interface LLMConfig {
 }
 
 function getConfig(): LLMConfig {
-  const endpoint = import.meta.env.VITE_AZURE_AI_ENDPOINT
-  const apiKey = import.meta.env.VITE_AZURE_SECRET_KEY
-  const deploymentName = import.meta.env.VITE_AZURE_AI_DEPLOYMENT_NAME
+  const endpoint = import.meta.env.AZURE_AI_ENDPOINT
+  const apiKey = import.meta.env.AZURE_SECRET_KEY
+  const deploymentName = import.meta.env.AZURE_AI_DEPLOYMENT_NAME
 
   if (!endpoint || !apiKey || !deploymentName) {
-    throw new Error('Azure AI configuration missing. Please set VITE_AZURE_AI_ENDPOINT, VITE_AZURE_SECRET_KEY, and VITE_AZURE_AI_DEPLOYMENT_NAME.')
+    throw new Error('Azure AI configuration missing. Please set AZURE_AI_ENDPOINT, AZURE_SECRET_KEY, and AZURE_AI_DEPLOYMENT_NAME.')
   }
 
   return { endpoint, apiKey, deploymentName }

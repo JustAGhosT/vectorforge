@@ -32,10 +32,10 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Azure AI Configuration (passed to build if needed)
-          VITE_AZURE_AI_ENDPOINT: ${{ secrets.AZURE_AI_ENDPOINT }}
-          VITE_AZURE_SECRET_KEY: ${{ secrets.AZURE_SECRET_KEY }}
-          VITE_AZURE_AI_DEPLOYMENT_NAME: ${{ secrets.AZURE_AI_DEPLOYMENT_NAME }}
+          # Azure AI Configuration
+          AZURE_AI_ENDPOINT: ${{ secrets.AZURE_AI_ENDPOINT }}
+          AZURE_SECRET_KEY: ${{ secrets.AZURE_SECRET_KEY }}
+          AZURE_AI_DEPLOYMENT_NAME: ${{ secrets.AZURE_AI_DEPLOYMENT_NAME }}
 
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v3.0

@@ -48,9 +48,9 @@ For local development, create a `.env` file in the project root:
 
 ```bash
 # Azure AI Configuration (Recommended)
-VITE_AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
-VITE_AZURE_SECRET_KEY=your-azure-key-here
-VITE_AZURE_AI_DEPLOYMENT_NAME=gpt-4o
+AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_SECRET_KEY=your-azure-key-here
+AZURE_AI_DEPLOYMENT_NAME=gpt-4o
 
 # OR for OpenAI directly
 # OPENAI_API_KEY=sk-your-api-key-here
