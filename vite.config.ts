@@ -28,7 +28,7 @@ async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymen
       },
       body: JSON.stringify({
         messages: [{ role: 'user', content: 'test' }],
-        max_tokens: 1
+        max_completion_tokens: 1
       })
     })
   } catch (error) {

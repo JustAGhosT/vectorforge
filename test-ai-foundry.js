@@ -47,7 +47,7 @@ async function testConnection() {
       },
       body: JSON.stringify({
         messages: [{ role: 'user', content: 'Say "Hello from AI Foundry!" in exactly those words.' }],
-        max_tokens: 50,
+        max_completion_tokens: 50,
         temperature: 0.1
       })
     });

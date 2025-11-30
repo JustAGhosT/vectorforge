@@ -48,7 +48,7 @@ export async function llm(
         content: prompt
       }
     ],
-    max_tokens: 4096,
+    max_completion_tokens: 4096,
     temperature: 0.7
   }
 
