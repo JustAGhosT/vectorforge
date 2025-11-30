@@ -1,14 +1,58 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { resolve } from 'path'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
+
+/**
+ * Vite plugin to validate required Azure AI environment variables during production builds.
+ * This ensures the build fails fast if the AI service is not properly configured.
+ */
+function validateAzureEnvPlugin(): Plugin {
+  return {
+    name: 'validate-azure-env',
+    buildStart() {
+      // Only validate during production builds
+      if (process.env.NODE_ENV !== 'production' && !process.env.CI) {
+        return
+      }
+
+      const requiredVars = [
+        'AZURE_AI_ENDPOINT',
+        'AZURE_SECRET_KEY',
+        'AZURE_AI_DEPLOYMENT_NAME'
+      ]
+
+      const missing = requiredVars.filter(varName => !process.env[varName])
+
+      if (missing.length > 0) {
+        throw new Error(
+          `Build failed: Missing required Azure AI environment variables: ${missing.join(', ')}.\n` +
+          `Please set these in your environment or CI/CD pipeline.\n` +
+          `See docs/ENVIRONMENT_SETUP.md for details.`
+        )
+      }
+
+      // Validate the endpoint URL format (only runs if all required vars are present)
+      const endpoint = process.env.AZURE_AI_ENDPOINT!
+      if (!endpoint.startsWith('https://')) {
+        throw new Error(
+          `Build failed: AZURE_AI_ENDPOINT must start with 'https://'. ` +
+          `Got: ${endpoint}`
+        )
+      }
+
+      console.log('✅ Azure AI configuration validated successfully')
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   envPrefix: ['VITE_', 'AZURE_'],
   plugins: [
+    validateAzureEnvPlugin(),
     react(),
     tailwindcss(),
   ],
