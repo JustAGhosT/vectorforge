@@ -876,7 +876,7 @@ function App() {
                 pngDataUrl={currentJob?.pngDataUrl || null}
                 onApplyChanges={handleApplySvgChange}
                 onDownload={() => currentJob && handleDownload(currentJob)}
-                onActivityLog={(title, desc) => logActivity(title, desc, 'remix', 'success')}
+                onActivityLog={(title, desc, type = 'remix', status = 'success', details) => logActivity(title, desc, type, status, details)}
                 comparison={comparison}
               />
             </Suspense>
