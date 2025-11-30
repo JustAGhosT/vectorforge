@@ -176,6 +176,65 @@ export function ActivityLogPanel({ entries, onClear, className }: ActivityLogPan
                               </pre>
                             </div>
                           )}
+                          {entry.status === 'success' && entry.type === 'ai-analysis' && entry.details && (
+                            <div className="mt-1.5 p-2 bg-purple-500/5 border border-purple-500/20 rounded text-[10px] space-y-1">
+                              {entry.details.overallScore !== undefined && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Score:</span>
+                                  <span className={cn(
+                                    'font-medium',
+                                    Number(entry.details.overallScore) >= 80 ? 'text-emerald-500' :
+                                    Number(entry.details.overallScore) >= 60 ? 'text-yellow-500' :
+                                    'text-orange-500'
+                                  )}>
+                                    {String(entry.details.overallScore)}/100
+                                  </span>
+                                </div>
+                              )}
+                              {entry.details.suggestionCount !== undefined && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Suggestions:</span>
+                                  <span className="font-medium">
+                                    {String(entry.details.suggestionCount)}
+                                    {Number(entry.details.highPrioritySuggestions) > 0 && (
+                                      <span className="text-red-500 ml-1">
+                                        ({String(entry.details.highPrioritySuggestions)} high priority)
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {Number(entry.details.strengths) > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Strengths:</span>
+                                  <span className="font-medium text-emerald-500">{String(entry.details.strengths)}</span>
+                                </div>
+                              )}
+                              {Number(entry.details.weaknesses) > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">Weaknesses:</span>
+                                  <span className="font-medium text-orange-500">{String(entry.details.weaknesses)}</span>
+                                </div>
+                              )}
+                              {(() => {
+                                const categories = entry.details.categories as Record<string, number> | undefined
+                                if (!categories || Object.keys(categories).length === 0) return null
+                                return (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {Object.entries(categories).map(([cat, count]) => (
+                                      <Badge
+                                        key={cat}
+                                        variant="outline"
+                                        className="h-4 text-[9px] px-1 bg-muted/50"
+                                      >
+                                        {cat}: {count}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          )}
                           <p className="text-[10px] text-muted-foreground/60 mt-1">
                             {formatRelativeTime(entry.timestamp)}
                           </p>

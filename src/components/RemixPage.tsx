@@ -52,12 +52,15 @@ import { useRemix, type RemixSuggestion, type RemixHistoryItem } from '@/hooks/u
 import { getAvailableTransformations, getPresets, type TransformationPreset } from '@/lib/remix-transformations'
 import type { ComparisonResult } from '@/lib/ai-comparison'
 
+type ActivityType = 'upload' | 'conversion' | 'ai-analysis' | 'ai-suggestion' | 'ai-iteration' | 'ai-chat' | 'remix' | 'settings' | 'download' | 'error' | 'system'
+type ActivityStatus = 'pending' | 'success' | 'error'
+
 interface RemixPageProps {
   svgContent: string | null
   pngDataUrl: string | null
   onApplyChanges: (newSvg: string) => void
   onDownload: () => void
-  onActivityLog?: (title: string, description: string) => void
+  onActivityLog?: (title: string, description: string, type?: ActivityType, status?: ActivityStatus, details?: Record<string, unknown>) => string | void
   comparison?: ComparisonResult | null
   className?: string
 }
@@ -210,17 +213,58 @@ export function RemixPage({
       return
     }
 
+    // Log analysis start
+    onActivityLog?.('AI Analysis', 'Starting SVG analysis...', 'ai-analysis', 'pending')
+
     try {
-      await analyzeWithAI(displaySvg)
+      const result = await analyzeWithAI(displaySvg)
+
+      // Build detailed description
+      const suggestionCount = result.suggestions.length
+      const highPriority = result.suggestions.filter(s => s.priority === 'high').length
+      const strengthCount = result.strengths.length
+      const weaknessCount = result.weaknesses.length
+
+      let description = `Score: ${result.overallScore}/100`
+      if (suggestionCount > 0) {
+        description += ` | ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}`
+        if (highPriority > 0) {
+          description += ` (${highPriority} high priority)`
+        }
+      } else {
+        description += ' | No improvement suggestions'
+      }
+
+      // Log success with details
+      onActivityLog?.('AI Analysis Complete', description, 'ai-analysis', 'success', {
+        overallScore: result.overallScore,
+        suggestionCount,
+        highPrioritySuggestions: highPriority,
+        strengths: strengthCount,
+        weaknesses: weaknessCount,
+        useCases: result.useCases.length,
+        categories: result.suggestions.reduce((acc, s) => {
+          acc[s.category] = (acc[s.category] || 0) + 1
+          return acc
+        }, {} as Record<string, number>),
+      })
+
       toast.success('Analysis complete!', {
-        description: 'AI has evaluated your SVG and provided suggestions',
+        description: `Score: ${result.overallScore}/100 with ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}`,
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Please try again'
+
+      // Log error
+      onActivityLog?.('AI Analysis Failed', errorMessage, 'ai-analysis', 'error', {
+        error: errorMessage,
+      })
+
       toast.error('Analysis failed', {
-        description: error instanceof Error ? error.message : 'Please try again',
+        description: errorMessage,
       })
     }
-  }, [displaySvg, analyzeWithAI])
+  }, [displaySvg, analyzeWithAI, onActivityLog])
 
   const handleApplyTransformation = useCallback((transformationId: string, options?: Record<string, unknown>) => {
     if (!displaySvg) {
