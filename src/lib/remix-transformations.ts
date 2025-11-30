@@ -109,35 +109,133 @@ export function addBorder(svg: string, options: BorderOptions = {}): string {
  */
 export function modifyBackground(svg: string, options: BackgroundOptions = {}): string {
   const { remove = false, color, opacity = 1 } = options
-  
+
   if (remove) {
-    // Remove any background rectangles that cover the full SVG (100% width/height)
-    let result = svg.replace(/<rect[^>]*fill=["'][^"']*["'][^>]*width=["']100%["'][^>]*height=["']100%["'][^>]*\/?>/gi, '')
-    // Also remove rectangles at position 0,0 that have 100% dimensions (likely backgrounds)
-    result = result.replace(/<rect[^>]*(?:x=["']0["'][^>]*y=["']0["']|y=["']0["'][^>]*x=["']0["'])[^>]*\/?>/gi, (match) => {
-      // Only remove if it has 100% dimensions (indicating it's a full-size background)
-      // Don't remove based on fill attribute alone as that could remove foreground elements
-      if (!match.includes('transform') && (match.includes('width="100%"') || match.includes('height="100%"'))) {
-        return ''
+    // Get SVG dimensions for calculating coverage
+    const dims = getSvgDimensions(svg)
+    const svgWidth = dims?.width || 0
+    const svgHeight = dims?.height || 0
+
+    // Threshold for considering a color as "background" (near-white)
+    const BACKGROUND_COLOR_THRESHOLD = 245
+
+    // Check if a color is a background-like color (white, near-white, light gray)
+    const isBackgroundColor = (fillColor: string): boolean => {
+      if (!fillColor) return false
+
+      // Common background colors
+      const bgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255, 255, 255)']
+      const normalizedColor = fillColor.toLowerCase().replace(/\s/g, '')
+      if (bgColors.includes(normalizedColor)) return true
+
+      // Check for light colors (RGB values close to 255)
+      const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
+      if (rgbMatch) {
+        const [, r, g, b] = rgbMatch.map(Number)
+        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
       }
-      return match
-    })
+
+      // Check hex colors
+      const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
+      if (hexMatch) {
+        const r = parseInt(hexMatch[1], 16)
+        const g = parseInt(hexMatch[2], 16)
+        const b = parseInt(hexMatch[3], 16)
+        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      }
+
+      // Check short hex colors like #fff
+      const shortHexMatch = normalizedColor.match(/#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
+      if (shortHexMatch) {
+        const r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
+        const g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
+        const b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
+        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      }
+
+      return false
+    }
+
+    // Check if a rect covers the full SVG area
+    const isFullCoverRect = (rectStr: string): boolean => {
+      // Check for 100% dimensions first
+      if (rectStr.includes('width="100%"') && rectStr.includes('height="100%"')) {
+        return true
+      }
+
+      // Parse actual pixel dimensions
+      const xMatch = rectStr.match(/\bx=["']([^"']+)["']/i)
+      const yMatch = rectStr.match(/\by=["']([^"']+)["']/i)
+      const wMatch = rectStr.match(/\bwidth=["']([^"']+)["']/i)
+      const hMatch = rectStr.match(/\bheight=["']([^"']+)["']/i)
+
+      const x = xMatch ? parseFloat(xMatch[1]) : 0
+      const y = yMatch ? parseFloat(yMatch[1]) : 0
+      const w = wMatch ? parseFloat(wMatch[1]) : 0
+      const h = hMatch ? parseFloat(hMatch[1]) : 0
+
+      // If rect starts at/near 0,0 and covers most of the SVG (95%+)
+      if (svgWidth > 0 && svgHeight > 0) {
+        if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
+          return true
+        }
+      }
+
+      return false
+    }
+
+    let result = svg
+
+    // Remove full-coverage rectangles with background colors
+    result = result.replace(
+      /<rect[^>]*\/?>/gi,
+      (match) => {
+        const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+        const fill = fillMatch ? fillMatch[1] : ''
+
+        if (isBackgroundColor(fill) && isFullCoverRect(match)) {
+          return '' // Remove the background rect
+        }
+        return match
+      }
+    )
+
+    // Also check for path elements that might be background rectangles
+    result = result.replace(
+      /<path[^>]*d=["']([^"']+)["'][^>]*>/gi,
+      (match, dAttr) => {
+        const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+        const fill = fillMatch ? fillMatch[1] : ''
+
+        // Check if the path is a simple rectangle pattern
+        const isRectPath = /^M\s*0[\s,]+0[\s,]*[HhLl].*[VvLl].*[HhLl].*[Zz]?\s*$/i.test(dAttr.trim())
+
+        if (isBackgroundColor(fill) && isRectPath) {
+          return '' // Remove the background path
+        }
+        return match
+      }
+    )
+
+    // Clean up any resulting empty lines
+    result = result.replace(/\n\s*\n/g, '\n')
+
     return result
   }
-  
+
   if (color) {
     const dims = getSvgDimensions(svg)
     if (!dims) return svg
-    
+
     const contentMatch = svg.match(/<svg[^>]*>([\s\S]*)<\/svg>/i)
     if (!contentMatch) return svg
-    
+
     const svgOpenMatch = svg.match(/<svg[^>]*>/i)
     const bgRect = `<rect x="0" y="0" width="${dims.width}" height="${dims.height}" fill="${color}" opacity="${opacity}" />`
-    
+
     return svg.replace(svgOpenMatch![0], `${svgOpenMatch![0]}\n  ${bgRect}`)
   }
-  
+
   return svg
 }
 
