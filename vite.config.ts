@@ -7,7 +7,10 @@ const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
 
 /**
  * Validates that the Azure AI endpoint is reachable and properly configured.
- * Makes a lightweight test request to verify the endpoint exists.
+ * Makes a minimal test request to verify the endpoint exists.
+ * 
+ * Note: Azure OpenAI API doesn't support HEAD requests or a dedicated health endpoint,
+ * so we must make a minimal POST request. We use max_tokens: 1 to minimize token usage.
  */
 async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymentName: string): Promise<void> {
   const baseEndpoint = endpoint.replace(/\/$/, '')
@@ -16,6 +19,7 @@ async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymen
   let response: Response
   try {
     // Make a minimal test request to verify the endpoint
+    // Using max_tokens: 1 to minimize token usage during validation
     response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -61,8 +65,13 @@ async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymen
     )
   }
 
-  // For other errors (like rate limits 429, server errors 5xx), we'll allow the build
+  // For rate limits (429) and server errors (5xx), we'll allow the build
   // since these are transient and don't indicate misconfiguration
+  if (response.status === 429) {
+    console.log(`⚠️  Azure AI endpoint returned 429 (rate limited) - configuration appears valid but rate limited`)
+    return
+  }
+
   if (response.status >= 500) {
     console.log(`⚠️  Azure AI endpoint returned ${response.status} - service may be temporarily unavailable, but configuration appears valid`)
     return
