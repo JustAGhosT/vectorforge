@@ -35,7 +35,7 @@ jobs:
           # Azure AI Configuration (passed to build if needed)
           VITE_AZURE_AI_ENDPOINT: ${{ secrets.AZURE_AI_ENDPOINT }}
           VITE_AZURE_SECRET_KEY: ${{ secrets.AZURE_SECRET_KEY }}
-          VITE_AZURE_MODEL_NAME: ${{ secrets.AZURE_MODEL_NAME }}
+          VITE_AZURE_AI_DEPLOYMENT_NAME: ${{ secrets.AZURE_AI_DEPLOYMENT_NAME }}
 
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v3.0

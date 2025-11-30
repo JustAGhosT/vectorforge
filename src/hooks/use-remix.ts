@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { parseLLMError } from '@/lib/utils'
+import { llm, isLLMConfigured } from '@/lib/llm'
 import {
   addBorder,
   modifyBackground,
@@ -57,7 +58,7 @@ export function useRemix() {
     setIsAnalyzing(true)
     
     try {
-      if (!window.spark?.llm) {
+      if (!isLLMConfigured()) {
         throw new Error('AI service not available')
       }
 
@@ -105,7 +106,7 @@ Provide 3-6 suggestions. Return only valid JSON.`
 
       let response: string
       try {
-        response = await window.spark.llm(prompt, 'gpt-4o-mini', false)
+        response = await llm(prompt, undefined, false)
       } catch (error) {
         throw new Error(parseLLMError(error))
       }

@@ -7,6 +7,7 @@ import {
   type ConversionSettings,
 } from '@/lib/converter'
 import { parseLLMError } from '@/lib/utils'
+import { llm } from '@/lib/llm'
 
 export interface IterationResult {
   iteration: number
@@ -70,20 +71,20 @@ Be critical but fair. Most conversions will score between 60-85.`
 
         let response: string
         try {
-          response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+          response = await llm(promptText, undefined, true)
         } catch (llmError) {
           throw new Error(parseLLMError(llmError))
         }
-        
+
         if (!response) {
           throw new Error('No response from AI service')
         }
-        
+
         // Check if response looks like an error page (HTML)
         if (response.includes('<!DOCTYPE') || response.includes('<html')) {
           throw new Error('LLM service returned an error. Please try again later.')
         }
-        
+
         const result = JSON.parse(response)
         
         return {
@@ -131,18 +132,18 @@ Return only the JSON, no other text.`
 
         let response: string
         try {
-          response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+          response = await llm(promptText, undefined, true)
         } catch (llmError) {
           console.error('Settings suggestion LLM call failed:', llmError)
           return createFallbackSettings(currentSettings)
         }
-        
+
         // Check if response looks like an error page (HTML)
         if (response.includes('<!DOCTYPE') || response.includes('<html')) {
           console.error('Settings suggestion received HTML error page')
           return createFallbackSettings(currentSettings)
         }
-        
+
         const suggested = JSON.parse(response)
 
         return {

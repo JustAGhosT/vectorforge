@@ -1,5 +1,5 @@
 {
-    "name": "spark-template",
+    "name": "vectorforge",
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -14,7 +14,6 @@
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@github/spark": "^0.39.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^4.1.3",
         "@octokit/core": "^6.1.4",
