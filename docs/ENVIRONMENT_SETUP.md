@@ -1,62 +1,220 @@
 # Environment Setup Guide
 
-This document outlines the required GitHub secrets and environment variables needed to run VectorForge with AI optimization features.
+This document provides **detailed step-by-step instructions** for setting up VectorForge credentials. Follow these instructions exactly.
 
-## Required GitHub Secrets
+---
 
-VectorForge uses AI-powered image analysis to provide intelligent SVG conversion recommendations. To enable this functionality, you need to configure the following GitHub secrets:
+## 🎯 Quick Summary: What You Need
 
-### Deployment (Netlify)
+VectorForge needs **3 things** from Azure to use AI features:
+1. **Endpoint URL** - looks like `https://something.openai.azure.com/`
+2. **API Key** - a long string of random characters
+3. **Deployment Name** - the name you gave your model (e.g., `gpt-4o`)
 
-| Secret Name | Description | How to Obtain |
-|------------|-------------|---------------|
-| `NETLIFY_AUTH_TOKEN` | Netlify personal access token | 1. Go to [app.netlify.com](https://app.netlify.com)<br>2. User Settings → Applications → Personal access tokens<br>3. Generate new token |
-| `NETLIFY_SITE_ID` | Your Netlify site ID | Found in Site settings → General → Site details |
+---
 
-### Azure AI Configuration (Recommended)
+## 📁 LOCAL DEVELOPMENT SETUP (Step-by-Step)
 
-The application uses Azure AI for intelligent image analysis and optimization suggestions.
+### Step 1: Create the `.env` file
 
-| Secret Name | Description | How to Obtain |
-|------------|-------------|---------------|
-| `AZURE_AI_ENDPOINT` | Your Azure AI endpoint URL | Available in Azure Portal under your Azure AI resource |
-| `AZURE_SECRET_KEY` | Your Azure AI API key | Found in Azure Portal under Keys and Endpoint section |
-| `AZURE_AI_DEPLOYMENT_NAME` | Model deployment name (e.g., `gpt-4o`) | The name you assigned when deploying the model |
+1. Open your terminal/command prompt
+2. Navigate to the VectorForge project folder:
+   ```bash
+   cd vectorforge
+   ```
+3. Create a new file called `.env` (note the dot at the beginning):
+   
+   **On Mac/Linux:**
+   ```bash
+   touch .env
+   ```
+   
+   **On Windows (Command Prompt):**
+   ```cmd
+   type nul > .env
+   ```
+   
+   **On Windows (PowerShell):**
+   ```powershell
+   New-Item -Path .env -ItemType File
+   ```
+   
+   **Or just use your code editor:**
+   - Right-click in the project folder
+   - Create new file
+   - Name it exactly: `.env` (with the dot!)
 
-#### Setting Up Azure AI
+### Step 2: Copy this EXACT content into your `.env` file
 
-1. Create an Azure OpenAI resource in the [Azure Portal](https://portal.azure.com)
-2. Deploy the GPT-4o model (or your preferred model)
-3. Copy your endpoint URL and API key
-4. Add these as GitHub secrets:
-   - Go to your GitHub repository
-   - Navigate to **Settings** → **Secrets and variables** → **Actions**
-   - Click **New repository secret**
-   - Add each secret with the exact names above
-
-### Alternative: OpenAI Configuration
-
-If you prefer using OpenAI directly instead of Azure:
-
-| Secret Name | Description | How to Obtain |
-|------------|-------------|---------------|
-| `OPENAI_API_KEY` | Your OpenAI API key for GPT-4o access | 1. Go to [platform.openai.com](https://platform.openai.com)<br>2. Navigate to API Keys section<br>3. Create a new secret key |
-
-## Environment Variables (Local Development)
-
-For local development, create a `.env` file in the project root:
+Open the `.env` file in any text editor and paste this:
 
 ```bash
-# Azure AI Configuration (Recommended)
-AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_SECRET_KEY=your-azure-key-here
-AZURE_AI_DEPLOYMENT_NAME=gpt-4o
-
-# OR for OpenAI directly
-# OPENAI_API_KEY=sk-your-api-key-here
+AZURE_AI_ENDPOINT=PASTE_YOUR_ENDPOINT_HERE
+AZURE_SECRET_KEY=PASTE_YOUR_API_KEY_HERE
+AZURE_AI_DEPLOYMENT_NAME=PASTE_YOUR_DEPLOYMENT_NAME_HERE
 ```
 
-> **⚠️ Important**: Never commit your `.env` file to version control. It's already included in `.gitignore`.
+### Step 3: Get your Azure credentials and paste them in
+
+Replace the placeholder values with your actual credentials:
+
+| Replace this... | With... | Example |
+|-----------------|---------|---------|
+| `PASTE_YOUR_ENDPOINT_HERE` | Your Azure endpoint URL | `https://myresource.openai.azure.com/` |
+| `PASTE_YOUR_API_KEY_HERE` | Your Azure API key | `abc123def456ghi789...` |
+| `PASTE_YOUR_DEPLOYMENT_NAME_HERE` | Your model deployment name | `gpt-4o` |
+
+**Your final `.env` file should look like this:**
+```bash
+AZURE_AI_ENDPOINT=https://myresource.openai.azure.com/
+AZURE_SECRET_KEY=abc123def456ghi789jkl012mno345pqr678
+AZURE_AI_DEPLOYMENT_NAME=gpt-4o
+```
+
+### Step 4: Restart your development server
+
+After saving the `.env` file:
+1. Stop the server (press `Ctrl+C` in the terminal)
+2. Start it again:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## 🔑 WHERE TO FIND YOUR AZURE CREDENTIALS
+
+### Finding Your Endpoint URL
+
+1. Go to [Azure Portal](https://portal.azure.com)
+2. Search for **"Azure OpenAI"** in the search bar
+3. Click on your Azure OpenAI resource
+4. In the left sidebar, click **"Keys and Endpoint"**
+5. Copy the **Endpoint** URL (it looks like `https://your-resource-name.openai.azure.com/`)
+
+<!-- The endpoint and key are found in the "Keys and Endpoint" section of your Azure OpenAI resource -->
+
+### Finding Your API Key
+
+1. On the same **"Keys and Endpoint"** page
+2. Copy either **KEY 1** or **KEY 2** (both work)
+3. Click the copy button next to the key
+
+### Finding Your Deployment Name
+
+1. In your Azure OpenAI resource
+2. Click **"Model deployments"** in the left sidebar (or go to Azure AI Studio)
+3. Look for the **Name** column - this is your deployment name
+4. If you deployed GPT-4o, it might be named `gpt-4o` or whatever you called it during deployment
+
+---
+
+## 🌐 GITHUB SECRETS SETUP (For CI/CD Deployment)
+
+If you want to deploy VectorForge automatically via GitHub Actions:
+
+### Step 1: Go to your repository settings
+
+1. Open your GitHub repository
+2. Click **Settings** (tab at the top)
+3. In the left sidebar, click **Secrets and variables**
+4. Click **Actions**
+
+### Step 2: Add each secret
+
+Click **"New repository secret"** and add these one by one:
+
+| Name (copy exactly) | Value |
+|---------------------|-------|
+| `AZURE_AI_ENDPOINT` | Your endpoint URL (e.g., `https://myresource.openai.azure.com/`) |
+| `AZURE_SECRET_KEY` | Your API key |
+| `AZURE_AI_DEPLOYMENT_NAME` | Your deployment name (e.g., `gpt-4o`) |
+| `NETLIFY_AUTH_TOKEN` | Your Netlify personal access token |
+| `NETLIFY_SITE_ID` | Your Netlify site ID |
+
+---
+
+## ⚠️ COMMON MISTAKES (AND HOW TO FIX THEM)
+
+### ❌ Mistake 1: Wrong file name
+- **Wrong:** `env`, `.env.txt`, `.env.local`
+- **Correct:** `.env` (exactly this, with the dot, no extension)
+
+### ❌ Mistake 2: Spaces around the equals sign
+- **Wrong:** `AZURE_AI_ENDPOINT = https://...`
+- **Correct:** `AZURE_AI_ENDPOINT=https://...` (no spaces!)
+
+### ❌ Mistake 3: Quotes around values
+- **Wrong:** `AZURE_AI_ENDPOINT="https://..."`
+- **Correct:** `AZURE_AI_ENDPOINT=https://...` (no quotes needed)
+
+### ❌ Mistake 4: Extra trailing slash issues
+- **Both work:** `https://myresource.openai.azure.com/` or `https://myresource.openai.azure.com`
+- The app handles both formats automatically
+
+### ❌ Mistake 5: Forgetting to restart the server
+- After changing `.env`, you MUST restart the dev server
+- Press `Ctrl+C` to stop, then `npm run dev` to start again
+
+### ❌ Mistake 6: File in wrong location
+- The `.env` file must be in the **root** of the project (same folder as `package.json`)
+- **Wrong:** `vectorforge/src/.env`
+- **Correct:** `vectorforge/.env`
+
+---
+
+## ✅ VERIFICATION: How to Check If It's Working
+
+1. Start your dev server: `npm run dev`
+2. Open the app in your browser
+3. Upload any image
+4. Click the **"AI Optimize"** button
+5. If configured correctly, you'll see AI suggestions appear
+6. If not configured, you'll see an error message
+
+---
+
+## 🆘 STILL NOT WORKING?
+
+### Check 1: File exists and is readable
+```bash
+# In terminal, from project root:
+cat .env
+```
+You should see your credentials printed out.
+
+### Check 2: No typos in variable names
+The variable names must be EXACTLY:
+- `AZURE_AI_ENDPOINT`
+- `AZURE_SECRET_KEY`
+- `AZURE_AI_DEPLOYMENT_NAME`
+
+### Check 3: API key is valid
+- Make sure you copied the full key
+- Try regenerating a new key in Azure Portal
+
+### Check 4: Deployment exists
+- Make sure you actually deployed a model in Azure AI Studio
+- The deployment name must match exactly what you put in `.env`
+
+---
+
+## 📋 COMPLETE EXAMPLE `.env` FILE
+
+Here's exactly what a working `.env` file looks like:
+
+```bash
+# VectorForge Environment Configuration
+# =====================================
+# Copy this file and replace the values with your actual credentials
+
+# Azure OpenAI Settings (all 3 are required)
+AZURE_AI_ENDPOINT=https://my-openai-resource.openai.azure.com/
+AZURE_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AZURE_AI_DEPLOYMENT_NAME=gpt-4o
+```
+
+Save this as `.env` in your project root folder and you're done!
 
 ## Features Requiring AI Configuration
 
