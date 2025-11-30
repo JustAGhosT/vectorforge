@@ -143,8 +143,9 @@ function removeEmptyElements(svg: string): string {
  * Simplify path data by reducing decimal precision
  */
 function simplifyPaths(svg: string, precision = 2): string {
+  // Match numbers with 2+ decimal places for consistent simplification
   return svg.replace(
-    /(\d+\.\d{3,})/g,
+    /(\d+\.\d{2,})/g,
     (match) => parseFloat(match).toFixed(precision)
   )
 }
@@ -156,8 +157,11 @@ function optimizeGroups(svg: string): string {
   // Remove groups that only contain a single child
   let result = svg
   let changed = true
-  
-  while (changed) {
+  let iterations = 0
+  const MAX_ITERATIONS = 100 // Prevent infinite loops on malformed SVG
+
+  while (changed && iterations < MAX_ITERATIONS) {
+    iterations++
     const before = result
     result = result.replace(
       /<g([^>]*)>\s*(<(?:path|circle|rect|polygon|polyline|ellipse|line)[^>]*\/?>\s*)<\/g>/gi,
@@ -169,7 +173,7 @@ function optimizeGroups(svg: string): string {
     )
     changed = before !== result
   }
-  
+
   return result
 }
 
@@ -204,12 +208,12 @@ function removeBackground(svg: string): string {
   // Check if a color is a background-like color (white, near-white, light gray)
   const isBackgroundColor = (color: string): boolean => {
     if (!color) return false
-    
+
     // Common background colors
     const bgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255, 255, 255)']
     const normalizedColor = color.toLowerCase().replace(/\s/g, '')
     if (bgColors.includes(normalizedColor)) return true
-    
+
     // Check for light colors (RGB values close to 255)
     const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
     if (rgbMatch) {
@@ -217,8 +221,8 @@ function removeBackground(svg: string): string {
       // If all channels are above threshold, consider it a background
       if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
     }
-    
-    // Check hex colors
+
+    // Check 6-character hex colors
     const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
     if (hexMatch) {
       const r = parseInt(hexMatch[1], 16)
@@ -226,25 +230,41 @@ function removeBackground(svg: string): string {
       const b = parseInt(hexMatch[3], 16)
       if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
     }
-    
+
+    // Check 3-character short hex colors like #fff
+    const shortHexMatch = normalizedColor.match(/#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
+    if (shortHexMatch) {
+      const r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
+      const g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
+      const b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
+      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+    }
+
     return false
   }
   
   // Check if a rect covers the full SVG area
   const isFullCoverRect = (rectStr: string): boolean => {
+    // Check for 100% dimensions first (common in some SVG generators)
+    if (rectStr.includes('width="100%"') && rectStr.includes('height="100%"')) {
+      return true
+    }
+
     const xMatch = rectStr.match(/\bx=["']([^"']+)["']/i)
     const yMatch = rectStr.match(/\by=["']([^"']+)["']/i)
     const wMatch = rectStr.match(/\bwidth=["']([^"']+)["']/i)
     const hMatch = rectStr.match(/\bheight=["']([^"']+)["']/i)
-    
+
     const x = xMatch ? parseFloat(xMatch[1]) : 0
     const y = yMatch ? parseFloat(yMatch[1]) : 0
     const w = wMatch ? parseFloat(wMatch[1]) : 0
     const h = hMatch ? parseFloat(hMatch[1]) : 0
-    
-    // If rect starts at 0,0 and covers most of the SVG
-    if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
-      return true
+
+    // If rect starts at/near 0,0 and covers most of the SVG (95%+)
+    if (svgWidth > 0 && svgHeight > 0) {
+      if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
+        return true
+      }
     }
     return false
   }
