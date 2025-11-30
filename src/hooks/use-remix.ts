@@ -46,7 +46,9 @@ export function useRemix() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<RemixAnalysis | null>(null)
   const [history, setHistory] = useState<RemixHistoryItem[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)  // -1 means no history yet
   const [currentSvg, setCurrentSvg] = useState<string | null>(null)
+  const [initialSvg, setInitialSvg] = useState<string | null>(null)  // Store initial state for undo
 
   /**
    * Analyze SVG with AI and get suggestions
@@ -249,26 +251,88 @@ Provide 3-6 suggestions. Return only valid JSON.`
   ): string => {
     const { result, name: transformationName } = getTransformedSvg(svgContent, transformationId, options)
 
-    // Add to history
+    // Store initial state if this is the first transformation
+    if (!initialSvg) {
+      setInitialSvg(svgContent)
+    }
+
+    // Add to history (truncate any "future" items if we're in the middle of history)
     const historyItem: RemixHistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       svgContent: result,
       timestamp: Date.now(),
       transformationName,
     }
-    setHistory(prev => [historyItem, ...prev].slice(0, 20))
+
+    setHistory(prev => {
+      // If we're not at the end of history, truncate future items
+      const truncated = historyIndex >= 0 ? prev.slice(historyIndex) : prev
+      return [historyItem, ...truncated].slice(0, 20)
+    })
+    setHistoryIndex(0)  // Point to the new item
     setCurrentSvg(result)
 
     return result
-  }, [getTransformedSvg])
+  }, [getTransformedSvg, historyIndex, initialSvg])
 
   /**
    * Restore from history
    */
   const restoreFromHistory = useCallback((historyItem: RemixHistoryItem): string => {
+    // Find index of the item in history
+    const index = history.findIndex(h => h.id === historyItem.id)
+    if (index >= 0) {
+      setHistoryIndex(index)
+    }
     setCurrentSvg(historyItem.svgContent)
     return historyItem.svgContent
-  }, [])
+  }, [history])
+
+  /**
+   * Check if undo is available
+   */
+  const canUndo = historyIndex < history.length - 1 || (historyIndex === 0 && initialSvg !== null)
+
+  /**
+   * Check if redo is available
+   */
+  const canRedo = historyIndex > 0
+
+  /**
+   * Undo last transformation
+   */
+  const undo = useCallback((): string | null => {
+    if (!canUndo) return null
+
+    if (historyIndex < history.length - 1) {
+      // Move to previous history item
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      const svg = history[newIndex].svgContent
+      setCurrentSvg(svg)
+      return svg
+    } else if (initialSvg) {
+      // Restore to initial state
+      setHistoryIndex(history.length)  // Point past all history items
+      setCurrentSvg(initialSvg)
+      return initialSvg
+    }
+
+    return null
+  }, [canUndo, history, historyIndex, initialSvg])
+
+  /**
+   * Redo last undone transformation
+   */
+  const redo = useCallback((): string | null => {
+    if (!canRedo) return null
+
+    const newIndex = historyIndex - 1
+    setHistoryIndex(newIndex)
+    const svg = history[newIndex].svgContent
+    setCurrentSvg(svg)
+    return svg
+  }, [canRedo, history, historyIndex])
 
   /**
    * Clear history
@@ -296,5 +360,10 @@ Provide 3-6 suggestions. Return only valid JSON.`
     restoreFromHistory,
     clearHistory,
     clearAnalysis,
+    // Undo/Redo
+    canUndo,
+    canRedo,
+    undo,
+    redo,
   }
 }

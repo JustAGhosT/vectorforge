@@ -631,6 +631,87 @@ export function replaceColor(svg: string, oldColor: string, newColor: string): s
 }
 
 /**
+ * Transformation preset definition
+ */
+export interface TransformationPreset {
+  id: string
+  name: string
+  description: string
+  transformations: Array<{
+    id: string
+    options?: Record<string, unknown>
+  }>
+  icon: string
+}
+
+/**
+ * Get built-in transformation presets
+ */
+export function getPresets(): TransformationPreset[] {
+  return [
+    {
+      id: 'logo-ready',
+      name: 'Logo Ready',
+      description: 'Remove background and add a subtle border for logos',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'add-rounded-border', options: { strokeWidth: 1, strokeColor: '#e5e7eb', padding: 8 } },
+      ],
+      icon: 'Sparkle',
+    },
+    {
+      id: 'icon-optimized',
+      name: 'Icon Optimized',
+      description: 'Simplify paths and remove background for clean icons',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'simplify' },
+      ],
+      icon: 'Cube',
+    },
+    {
+      id: 'dark-mode-ready',
+      name: 'Dark Mode Ready',
+      description: 'Invert colors for dark theme compatibility',
+      transformations: [
+        { id: 'invert-colors' },
+      ],
+      icon: 'Moon',
+    },
+    {
+      id: 'print-ready',
+      name: 'Print Ready',
+      description: 'Convert to grayscale and add border for printing',
+      transformations: [
+        { id: 'grayscale' },
+        { id: 'add-rectangle-border', options: { strokeWidth: 1, strokeColor: '#000000', padding: 10 } },
+      ],
+      icon: 'Printer',
+    },
+    {
+      id: 'social-avatar',
+      name: 'Social Avatar',
+      description: 'Add circle border for profile pictures',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'add-circle-border', options: { strokeWidth: 2, strokeColor: '#3b82f6', padding: 5 } },
+      ],
+      icon: 'User',
+    },
+    {
+      id: 'outlined-style',
+      name: 'Outlined Style',
+      description: 'Convert fills to strokes for line art look',
+      transformations: [
+        { id: 'fill-to-stroke' },
+        { id: 'remove-background' },
+      ],
+      icon: 'PencilLine',
+    },
+  ]
+}
+
+/**
  * Get list of all available transformations
  */
 export function getAvailableTransformations(): Array<{
