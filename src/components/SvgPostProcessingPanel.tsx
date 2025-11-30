@@ -6,7 +6,10 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
 import {
   MagicWand,
   Path,
@@ -21,11 +24,12 @@ import {
   Circle,
   RectangleDashed,
   FileCode,
-  ArrowDown,
-  ArrowUp,
+  SwapCircle,
+  PaintBucket,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useSvgModification, type SvgModificationOptions } from '@/hooks/use-svg-modification'
+import { extractColorPalette, replaceColor, type ColorInfo } from '@/lib/remix-transformations'
 import { toast } from 'sonner'
 
 interface SvgPostProcessingPanelProps {
@@ -65,19 +69,27 @@ export function SvgPostProcessingPanel({
   className,
 }: SvgPostProcessingPanelProps) {
   const { getSvgInfo, modifySvg, isProcessing } = useSvgModification()
-  
+
   // Border settings state
   const [borderType, setBorderType] = useState<'rounded' | 'circle'>('rounded')
   const [borderColor, setBorderColor] = useState('#000000')
   const [borderWidth, setBorderWidth] = useState(2)
   const [borderPadding, setBorderPadding] = useState(10)
-  
+
+  // Background settings state
+  const [includeDarkBg, setIncludeDarkBg] = useState(false)
+
+  // Color replacement state
+  const [selectedColor, setSelectedColor] = useState<string | null>(null)
+  const [replacementColor, setReplacementColor] = useState('#000000')
+
   const svgInfo = useMemo(() => {
     if (!currentSvg) return null
     const info = getSvgInfo(currentSvg)
     return {
       ...info,
       size: getSvgSize(currentSvg),
+      colorPalette: extractColorPalette(currentSvg),
     }
   }, [currentSvg, getSvgInfo])
 
@@ -115,14 +127,32 @@ export function SvgPostProcessingPanel({
   const handleRemoveBackground = useCallback(() => {
     if (!currentSvg) return
 
-    const modified = modifySvg(currentSvg, { removeBackground: true })
+    const modified = modifySvg(currentSvg, {
+      removeBackground: true,
+      removeDarkBackground: includeDarkBg,
+    })
+    const bgTypes = includeDarkBg ? 'light and dark' : 'white/light'
     applyWithFeedback(
       modified,
       'Background removed',
-      'White/light background elements removed',
-      'No white/light background found covering the full SVG'
+      `${bgTypes.charAt(0).toUpperCase() + bgTypes.slice(1)} background elements removed`,
+      `No ${bgTypes} background found covering the full SVG`
     )
-  }, [currentSvg, modifySvg, applyWithFeedback])
+  }, [currentSvg, modifySvg, applyWithFeedback, includeDarkBg])
+
+  // Color replacement
+  const handleReplaceColor = useCallback(() => {
+    if (!currentSvg || !selectedColor) return
+
+    const modified = replaceColor(currentSvg, selectedColor, replacementColor)
+    applyWithFeedback(
+      modified,
+      'Color replaced',
+      `${selectedColor} replaced with ${replacementColor}`,
+      'Color not found in SVG'
+    )
+    setSelectedColor(null)
+  }, [currentSvg, selectedColor, replacementColor, applyWithFeedback])
 
   // Add border
   const handleAddBorder = useCallback(() => {
@@ -293,7 +323,18 @@ export function SvgPostProcessingPanel({
             </div>
             <CaretDown className="w-4 h-4" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2 space-y-2">
+          <CollapsibleContent className="pt-2 space-y-3">
+            {/* Include dark backgrounds toggle */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="include-dark-bg" className="text-xs cursor-pointer">
+                Include dark backgrounds
+              </Label>
+              <Switch
+                id="include-dark-bg"
+                checked={includeDarkBg}
+                onCheckedChange={setIncludeDarkBg}
+              />
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -305,7 +346,9 @@ export function SvgPostProcessingPanel({
               <div className="text-left">
                 <div className="text-xs font-medium">Remove Background</div>
                 <div className="text-[10px] text-muted-foreground">
-                  Remove white/light background for transparency
+                  {includeDarkBg
+                    ? 'Remove light and dark backgrounds'
+                    : 'Remove white/light background for transparency'}
                 </div>
               </div>
             </Button>
@@ -418,6 +461,124 @@ export function SvgPostProcessingPanel({
               <FrameCorners className="w-4 h-4" weight="fill" />
               Apply Border
             </Button>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Separator />
+
+        {/* Color Palette Section */}
+        <Collapsible>
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 text-sm font-semibold hover:text-primary transition-colors">
+            <div className="flex items-center gap-2">
+              <Palette weight="bold" className="w-4 h-4 text-purple-500" />
+              Color Palette
+              {svgInfo?.colorPalette && svgInfo.colorPalette.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {svgInfo.colorPalette.length}
+                </Badge>
+              )}
+            </div>
+            <CaretDown className="w-4 h-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 space-y-3">
+            {svgInfo?.colorPalette && svgInfo.colorPalette.length > 0 ? (
+              <>
+                {/* Color swatches */}
+                <div className="flex flex-wrap gap-1.5">
+                  {svgInfo.colorPalette.slice(0, 12).map((colorInfo, index) => (
+                    <Popover key={index}>
+                      <PopoverTrigger asChild>
+                        <button
+                          className={cn(
+                            'w-7 h-7 rounded border-2 transition-all hover:scale-110',
+                            selectedColor === colorInfo.color
+                              ? 'border-primary ring-2 ring-primary/30'
+                              : 'border-border hover:border-primary/50'
+                          )}
+                          style={{ backgroundColor: colorInfo.color }}
+                          title={`${colorInfo.color} (${colorInfo.count} uses)`}
+                          onClick={() => {
+                            setSelectedColor(colorInfo.color)
+                            setReplacementColor(colorInfo.color)
+                          }}
+                        />
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-3" align="start">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded border border-border"
+                              style={{ backgroundColor: colorInfo.color }}
+                            />
+                            <div>
+                              <p className="text-xs font-mono">{colorInfo.color}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {colorInfo.count} {colorInfo.count === 1 ? 'use' : 'uses'} ({colorInfo.type})
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ))}
+                </div>
+
+                {/* Color replacement */}
+                {selectedColor && (
+                  <div className="space-y-2 p-2 bg-muted/50 rounded-md">
+                    <Label className="text-xs font-medium">Replace Color</Label>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded border border-border shrink-0"
+                        style={{ backgroundColor: selectedColor }}
+                      />
+                      <SwapCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+                        type="color"
+                        value={replacementColor}
+                        onChange={(e) => setReplacementColor(e.target.value)}
+                        className="w-10 h-8 p-0.5 cursor-pointer shrink-0"
+                      />
+                      <Input
+                        type="text"
+                        value={replacementColor}
+                        onChange={(e) => setReplacementColor(e.target.value)}
+                        className="h-8 text-xs font-mono flex-1"
+                        placeholder="#000000"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 gap-1.5"
+                        onClick={handleReplaceColor}
+                        disabled={isProcessing || selectedColor === replacementColor}
+                      >
+                        <PaintBucket className="w-3.5 h-3.5" weight="fill" />
+                        Replace
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedColor(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {svgInfo.colorPalette.length > 12 && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    +{svgInfo.colorPalette.length - 12} more colors
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                No colors found in SVG
+              </p>
+            )}
           </CollapsibleContent>
         </Collapsible>
 
