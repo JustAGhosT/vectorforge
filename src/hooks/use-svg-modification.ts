@@ -6,6 +6,7 @@ export interface SvgModificationOptions {
   optimizeGroups?: boolean
   removeEmptyElements?: boolean
   removeBackground?: boolean
+  removeDarkBackground?: boolean  // Also remove dark/black backgrounds
   addBorder?: {
     type: 'rounded' | 'circle'
     color: string
@@ -183,8 +184,10 @@ function optimizeGroups(svg: string): string {
  * 1. The first/largest rectangle covering the entire viewBox
  * 2. Elements with fill colors close to white/light gray
  * 3. Elements with fill="white" or fill="#fff*"
+ * @param svg - The SVG string to process
+ * @param includeDark - Also remove dark/black backgrounds
  */
-function removeBackground(svg: string): string {
+function removeBackground(svg: string, includeDark = false): string {
   // Parse SVG dimensions
   const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/i)
   const widthMatch = svg.match(/width=["']([^"']+)["']/i)
@@ -202,42 +205,60 @@ function removeBackground(svg: string): string {
     svgHeight = parseFloat(heightMatch[1]) || 0
   }
   
-  // Threshold for considering a color as "background" (near-white)
-  const BACKGROUND_COLOR_THRESHOLD = 245
-  
-  // Check if a color is a background-like color (white, near-white, light gray)
+  // Thresholds for considering a color as "background"
+  const LIGHT_THRESHOLD = 245  // Near-white
+  const DARK_THRESHOLD = 10    // Near-black
+
+  // Check if a color is a background-like color
   const isBackgroundColor = (color: string): boolean => {
     if (!color) return false
 
-    // Common background colors
-    const bgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255, 255, 255)']
     const normalizedColor = color.toLowerCase().replace(/\s/g, '')
-    if (bgColors.includes(normalizedColor)) return true
 
-    // Check for light colors (RGB values close to 255)
+    // Common light background colors
+    const lightBgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255,255,255)']
+    if (lightBgColors.includes(normalizedColor)) return true
+
+    // Common dark background colors (only check if includeDark is true)
+    if (includeDark) {
+      const darkBgColors = ['black', '#000', '#000000', '#111', '#111111', '#0a0a0a', 'rgb(0,0,0)']
+      if (darkBgColors.includes(normalizedColor)) return true
+    }
+
+    // Parse color to RGB for threshold checks
+    let r = -1, g = -1, b = -1
+
+    // Check for RGB format
     const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
     if (rgbMatch) {
-      const [, r, g, b] = rgbMatch.map(Number)
-      // If all channels are above threshold, consider it a background
-      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      r = Number(rgbMatch[1])
+      g = Number(rgbMatch[2])
+      b = Number(rgbMatch[3])
     }
 
     // Check 6-character hex colors
     const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
     if (hexMatch) {
-      const r = parseInt(hexMatch[1], 16)
-      const g = parseInt(hexMatch[2], 16)
-      const b = parseInt(hexMatch[3], 16)
-      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      r = parseInt(hexMatch[1], 16)
+      g = parseInt(hexMatch[2], 16)
+      b = parseInt(hexMatch[3], 16)
     }
 
     // Check 3-character short hex colors like #fff
     const shortHexMatch = normalizedColor.match(/#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
     if (shortHexMatch) {
-      const r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
-      const g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
-      const b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
-      if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
+      g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
+      b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
+    }
+
+    // If color was parsed successfully
+    if (r >= 0) {
+      // Check for light backgrounds
+      if (r > LIGHT_THRESHOLD && g > LIGHT_THRESHOLD && b > LIGHT_THRESHOLD) return true
+
+      // Check for dark backgrounds (only if includeDark is true)
+      if (includeDark && r < DARK_THRESHOLD && g < DARK_THRESHOLD && b < DARK_THRESHOLD) return true
     }
 
     return false
@@ -414,7 +435,7 @@ export function useSvgModification() {
       
       // Remove background first (before other operations)
       if (options.removeBackground) {
-        result = removeBackground(result)
+        result = removeBackground(result, options.removeDarkBackground)
       }
       
       if (options.removePotraceBlocks) {

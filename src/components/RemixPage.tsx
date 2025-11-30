@@ -38,12 +38,18 @@ import {
   CaretUp,
   CaretDown,
   Lightning,
+  Cube,
+  Moon,
+  Printer,
+  User,
+  PencilLine,
+  Stack,
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useRemix, type RemixSuggestion, type RemixHistoryItem } from '@/hooks/use-remix'
-import { getAvailableTransformations } from '@/lib/remix-transformations'
+import { getAvailableTransformations, getPresets, type TransformationPreset } from '@/lib/remix-transformations'
 import type { ComparisonResult } from '@/lib/ai-comparison'
 
 interface RemixPageProps {
@@ -62,6 +68,15 @@ const categoryIcons: Record<string, React.ElementType> = {
   color: Palette,
   transform: ArrowsOut,
   style: MagicWand,
+}
+
+const presetIcons: Record<string, React.ElementType> = {
+  Sparkle: Sparkle,
+  Cube: Cube,
+  Moon: Moon,
+  Printer: Printer,
+  User: User,
+  PencilLine: PencilLine,
 }
 
 const priorityColors = {
@@ -98,6 +113,10 @@ export function RemixPage({
     restoreFromHistory,
     clearHistory,
     clearAnalysis,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
   } = useRemix()
 
   const [activeTab, setActiveTab] = useState('suggestions')
@@ -113,6 +132,7 @@ export function RemixPage({
   })
 
   const transformations = useMemo(() => getAvailableTransformations(), [])
+  const presets = useMemo(() => getPresets(), [])
   const transformationsByCategory = useMemo(() => {
     const grouped: Record<string, typeof transformations> = {}
     transformations.forEach((t) => {
@@ -130,6 +150,57 @@ export function RemixPage({
       setCurrentSvg(svgContent)
     }
   }, [svgContent, currentSvg, setCurrentSvg])
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return
+    const result = undo()
+    if (result) {
+      setPreviewSvg(null)
+      toast.info('Undo', { description: 'Reverted to previous state' })
+      onActivityLog?.('Undo', 'Reverted to previous state')
+    }
+  }, [canUndo, undo, onActivityLog])
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return
+    const result = redo()
+    if (result) {
+      setPreviewSvg(null)
+      toast.info('Redo', { description: 'Restored next state' })
+      onActivityLog?.('Redo', 'Restored next state')
+    }
+  }, [canRedo, redo, onActivityLog])
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey
+
+      if (ctrlOrCmd && e.key === 'z' && !e.shiftKey) {
+        // Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+        e.preventDefault()
+        handleUndo()
+      } else if (
+        (ctrlOrCmd && e.key === 'y') ||
+        (ctrlOrCmd && e.shiftKey && e.key === 'z') ||
+        (ctrlOrCmd && e.shiftKey && e.key === 'Z')
+      ) {
+        // Redo: Ctrl+Y (Windows/Linux), Cmd+Shift+Z (Mac)
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleUndo, handleRedo])
 
   const displaySvg = previewSvg || currentSvg || svgContent
 
@@ -183,6 +254,30 @@ export function RemixPage({
       })
     }
   }, [displaySvg, applyTransformation, transformations, onActivityLog])
+
+  const handleApplyPreset = useCallback((preset: TransformationPreset) => {
+    if (!displaySvg) {
+      toast.error('No SVG to transform')
+      return
+    }
+
+    try {
+      // Apply each transformation in the preset sequentially
+      let result = displaySvg
+      for (const transform of preset.transformations) {
+        result = applyTransformation(result, transform.id, transform.options)
+      }
+
+      toast.success(`Preset applied: ${preset.name}`, {
+        description: preset.description,
+      })
+      onActivityLog?.(`Preset: ${preset.name}`, `Applied ${preset.transformations.length} transformations`)
+    } catch (error) {
+      toast.error('Preset failed', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      })
+    }
+  }, [displaySvg, applyTransformation, onActivityLog])
 
   const handlePreviewTransformation = useCallback((transformationId: string, options?: Record<string, unknown>) => {
     if (!displaySvg) return
@@ -284,6 +379,30 @@ export function RemixPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Undo/Redo buttons */}
+          <div className="flex items-center border border-border rounded-md">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="gap-1.5 px-2 rounded-r-none"
+              title="Undo (Ctrl+Z)"
+            >
+              <ArrowCounterClockwise className="w-4 h-4" weight="bold" />
+            </Button>
+            <Separator orientation="vertical" className="h-6" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="gap-1.5 px-2 rounded-l-none"
+              title="Redo (Ctrl+Y)"
+            >
+              <ArrowClockwise className="w-4 h-4" weight="bold" />
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -467,16 +586,65 @@ export function RemixPage({
         {/* Controls Panel */}
         <div className="space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-2">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="presets" className="gap-1.5">
+                <Stack className="w-4 h-4" weight="bold" />
+                Presets
+              </TabsTrigger>
               <TabsTrigger value="suggestions" className="gap-1.5">
                 <Lightbulb className="w-4 h-4" weight="bold" />
-                AI Suggestions
+                AI
               </TabsTrigger>
               <TabsTrigger value="transforms" className="gap-1.5">
                 <MagicWand className="w-4 h-4" weight="bold" />
-                Transforms
+                Manual
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="presets" className="mt-4 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Quick transformations for common use cases
+              </p>
+              <div className="grid gap-2">
+                {presets.map((preset) => {
+                  const Icon = presetIcons[preset.icon] || MagicWand
+                  return (
+                    <motion.div
+                      key={preset.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <Button
+                        variant="outline"
+                        className="w-full h-auto py-3 px-4 justify-start gap-3"
+                        onClick={() => handleApplyPreset(preset)}
+                      >
+                        <div className="p-1.5 bg-primary/10 rounded-md shrink-0">
+                          <Icon className="w-4 h-4 text-primary" weight="fill" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-medium">{preset.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {preset.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {preset.transformations.map((t, i) => (
+                              <Badge
+                                key={i}
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {transformations.find(tr => tr.id === t.id)?.name || t.id}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </Button>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </TabsContent>
 
             <TabsContent value="suggestions" className="mt-4 space-y-4">
               {/* AI Analyze Button */}

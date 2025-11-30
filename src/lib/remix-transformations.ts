@@ -13,6 +13,7 @@ export interface BorderOptions {
 
 export interface BackgroundOptions {
   remove?: boolean
+  removeDark?: boolean  // Also remove dark/black backgrounds
   color?: string
   opacity?: number
 }
@@ -108,49 +109,71 @@ export function addBorder(svg: string, options: BorderOptions = {}): string {
  * Remove or modify background
  */
 export function modifyBackground(svg: string, options: BackgroundOptions = {}): string {
-  const { remove = false, color, opacity = 1 } = options
+  const { remove = false, removeDark = false, color, opacity = 1 } = options
 
-  if (remove) {
+  if (remove || removeDark) {
     // Get SVG dimensions for calculating coverage
     const dims = getSvgDimensions(svg)
     const svgWidth = dims?.width || 0
     const svgHeight = dims?.height || 0
 
-    // Threshold for considering a color as "background" (near-white)
-    const BACKGROUND_COLOR_THRESHOLD = 245
+    // Thresholds for background detection
+    const LIGHT_THRESHOLD = 245  // Near-white colors
+    const DARK_THRESHOLD = 10    // Near-black colors
 
-    // Check if a color is a background-like color (white, near-white, light gray)
+    // Check if a color is a background-like color
     const isBackgroundColor = (fillColor: string): boolean => {
       if (!fillColor) return false
 
-      // Common background colors
-      const bgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255, 255, 255)']
       const normalizedColor = fillColor.toLowerCase().replace(/\s/g, '')
-      if (bgColors.includes(normalizedColor)) return true
 
-      // Check for light colors (RGB values close to 255)
-      const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
-      if (rgbMatch) {
-        const [, r, g, b] = rgbMatch.map(Number)
-        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      // Parse color to RGB
+      let r = -1, g = -1, b = -1
+
+      // Check named colors
+      if (normalizedColor === 'white') { r = 255; g = 255; b = 255 }
+      else if (normalizedColor === 'black') { r = 0; g = 0; b = 0 }
+      // Common light background colors
+      else if (['#fff', '#ffffff', '#fefefe', '#fafafa'].includes(normalizedColor)) { r = 255; g = 255; b = 255 }
+      // Common dark background colors
+      else if (['#000', '#000000', '#111', '#111111', '#0a0a0a'].includes(normalizedColor)) { r = 0; g = 0; b = 0 }
+      else {
+        // Parse RGB format
+        const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
+        if (rgbMatch) {
+          r = Number(rgbMatch[1])
+          g = Number(rgbMatch[2])
+          b = Number(rgbMatch[3])
+        }
+
+        // Parse 6-char hex
+        const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
+        if (hexMatch) {
+          r = parseInt(hexMatch[1], 16)
+          g = parseInt(hexMatch[2], 16)
+          b = parseInt(hexMatch[3], 16)
+        }
+
+        // Parse 3-char hex
+        const shortHexMatch = normalizedColor.match(/#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
+        if (shortHexMatch) {
+          r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
+          g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
+          b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
+        }
       }
 
-      // Check hex colors
-      const hexMatch = normalizedColor.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i)
-      if (hexMatch) {
-        const r = parseInt(hexMatch[1], 16)
-        const g = parseInt(hexMatch[2], 16)
-        const b = parseInt(hexMatch[3], 16)
-        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      // Check if color was parsed
+      if (r < 0) return false
+
+      // Check for light backgrounds
+      if (remove && r > LIGHT_THRESHOLD && g > LIGHT_THRESHOLD && b > LIGHT_THRESHOLD) {
+        return true
       }
 
-      // Check short hex colors like #fff
-      const shortHexMatch = normalizedColor.match(/#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
-      if (shortHexMatch) {
-        const r = parseInt(shortHexMatch[1] + shortHexMatch[1], 16)
-        const g = parseInt(shortHexMatch[2] + shortHexMatch[2], 16)
-        const b = parseInt(shortHexMatch[3] + shortHexMatch[3], 16)
-        if (r > BACKGROUND_COLOR_THRESHOLD && g > BACKGROUND_COLOR_THRESHOLD && b > BACKGROUND_COLOR_THRESHOLD) return true
+      // Check for dark backgrounds
+      if (removeDark && r < DARK_THRESHOLD && g < DARK_THRESHOLD && b < DARK_THRESHOLD) {
+        return true
       }
 
       return false
@@ -482,6 +505,210 @@ export function convertFillToStroke(svg: string, strokeWidth = 2): string {
       return `<path${before}fill="none" stroke="${fillColor}" stroke-width="${strokeWidth}"${after}>`
     }
   )
+}
+
+/**
+ * Extract color palette from SVG
+ * Returns array of unique colors with their usage count
+ */
+export interface ColorInfo {
+  color: string
+  count: number
+  type: 'fill' | 'stroke' | 'both'
+}
+
+export function extractColorPalette(svg: string): ColorInfo[] {
+  const colorMap = new Map<string, { fill: number; stroke: number }>()
+
+  // Normalize color to consistent format
+  const normalizeColor = (color: string): string | null => {
+    if (!color || color === 'none' || color === 'transparent') return null
+    const c = color.toLowerCase().trim()
+
+    // Convert named colors to hex
+    const namedColors: Record<string, string> = {
+      white: '#ffffff', black: '#000000', red: '#ff0000',
+      green: '#008000', blue: '#0000ff', yellow: '#ffff00',
+      cyan: '#00ffff', magenta: '#ff00ff', gray: '#808080',
+      grey: '#808080', orange: '#ffa500', purple: '#800080',
+    }
+    if (namedColors[c]) return namedColors[c]
+
+    // Normalize 3-char hex to 6-char
+    if (/^#[0-9a-f]{3}$/i.test(c)) {
+      return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`
+    }
+
+    // Return 6-char hex as-is
+    if (/^#[0-9a-f]{6}$/i.test(c)) {
+      return c
+    }
+
+    // Parse rgb() to hex
+    const rgbMatch = c.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i)
+    if (rgbMatch) {
+      const r = Math.min(255, parseInt(rgbMatch[1])).toString(16).padStart(2, '0')
+      const g = Math.min(255, parseInt(rgbMatch[2])).toString(16).padStart(2, '0')
+      const b = Math.min(255, parseInt(rgbMatch[3])).toString(16).padStart(2, '0')
+      return `#${r}${g}${b}`
+    }
+
+    return c // Return as-is for unknown formats
+  }
+
+  // Extract fill colors
+  const fillRegex = /fill=["']([^"']+)["']/gi
+  let match
+  while ((match = fillRegex.exec(svg)) !== null) {
+    const color = normalizeColor(match[1])
+    if (color) {
+      const existing = colorMap.get(color) || { fill: 0, stroke: 0 }
+      existing.fill++
+      colorMap.set(color, existing)
+    }
+  }
+
+  // Extract stroke colors
+  const strokeRegex = /\bstroke=["']([^"']+)["']/gi
+  while ((match = strokeRegex.exec(svg)) !== null) {
+    const color = normalizeColor(match[1])
+    if (color) {
+      const existing = colorMap.get(color) || { fill: 0, stroke: 0 }
+      existing.stroke++
+      colorMap.set(color, existing)
+    }
+  }
+
+  // Convert to array and sort by usage
+  const colors: ColorInfo[] = []
+  colorMap.forEach((counts, color) => {
+    colors.push({
+      color,
+      count: counts.fill + counts.stroke,
+      type: counts.fill > 0 && counts.stroke > 0 ? 'both'
+           : counts.fill > 0 ? 'fill' : 'stroke'
+    })
+  })
+
+  return colors.sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Replace a color throughout the SVG
+ */
+export function replaceColor(svg: string, oldColor: string, newColor: string): string {
+  const normalizeColor = (color: string): string => {
+    if (color.startsWith('#')) {
+      const hex = color.slice(1).toLowerCase()
+      if (hex.length === 3) {
+        return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+      }
+      return `#${hex}`
+    }
+    return color.toLowerCase()
+  }
+
+  const escapeRegex = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  const normalizedOld = normalizeColor(oldColor)
+  const escapedOld = escapeRegex(normalizedOld)
+
+  // Replace in fill attributes
+  let result = svg.replace(
+    new RegExp(`(fill=["'])${escapedOld}(["'])`, 'gi'),
+    `$1${newColor}$2`
+  )
+
+  // Replace in stroke attributes
+  result = result.replace(
+    new RegExp(`(stroke=["'])${escapedOld}(["'])`, 'gi'),
+    `$1${newColor}$2`
+  )
+
+  return result
+}
+
+/**
+ * Transformation preset definition
+ */
+export interface TransformationPreset {
+  id: string
+  name: string
+  description: string
+  transformations: Array<{
+    id: string
+    options?: Record<string, unknown>
+  }>
+  icon: string
+}
+
+/**
+ * Get built-in transformation presets
+ */
+export function getPresets(): TransformationPreset[] {
+  return [
+    {
+      id: 'logo-ready',
+      name: 'Logo Ready',
+      description: 'Remove background and add a subtle border for logos',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'add-rounded-border', options: { strokeWidth: 1, strokeColor: '#e5e7eb', padding: 8 } },
+      ],
+      icon: 'Sparkle',
+    },
+    {
+      id: 'icon-optimized',
+      name: 'Icon Optimized',
+      description: 'Simplify paths and remove background for clean icons',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'simplify' },
+      ],
+      icon: 'Cube',
+    },
+    {
+      id: 'dark-mode-ready',
+      name: 'Dark Mode Ready',
+      description: 'Invert colors for dark theme compatibility',
+      transformations: [
+        { id: 'invert-colors' },
+      ],
+      icon: 'Moon',
+    },
+    {
+      id: 'print-ready',
+      name: 'Print Ready',
+      description: 'Convert to grayscale and add border for printing',
+      transformations: [
+        { id: 'grayscale' },
+        { id: 'add-rectangle-border', options: { strokeWidth: 1, strokeColor: '#000000', padding: 10 } },
+      ],
+      icon: 'Printer',
+    },
+    {
+      id: 'social-avatar',
+      name: 'Social Avatar',
+      description: 'Add circle border for profile pictures',
+      transformations: [
+        { id: 'remove-background' },
+        { id: 'add-circle-border', options: { strokeWidth: 2, strokeColor: '#3b82f6', padding: 5 } },
+      ],
+      icon: 'User',
+    },
+    {
+      id: 'outlined-style',
+      name: 'Outlined Style',
+      description: 'Convert fills to strokes for line art look',
+      transformations: [
+        { id: 'fill-to-stroke' },
+        { id: 'remove-background' },
+      ],
+      icon: 'PencilLine',
+    },
+  ]
 }
 
 /**
