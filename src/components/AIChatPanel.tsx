@@ -21,6 +21,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn, parseLLMError } from '@/lib/utils'
 import { toast } from 'sonner'
+import { llm, isLLMConfigured } from '@/lib/llm'
 
 interface ChatMessage {
   id: string
@@ -67,7 +68,7 @@ export function AIChatPanel({
   }, [messages])
 
   const modifySvg = useCallback(async (instruction: string, svg: string): Promise<string> => {
-    if (!window.spark?.llm) {
+    if (!isLLMConfigured()) {
       throw new Error('AI service not available')
     }
 
@@ -91,7 +92,7 @@ Modified SVG:`
 
     let response: string
     try {
-      response = await window.spark.llm(prompt, 'gpt-4o', false)
+      response = await llm(prompt, undefined, false)
     } catch (error) {
       // Re-throw with a cleaner error message
       throw new Error(parseLLMError(error))

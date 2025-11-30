@@ -21,7 +21,7 @@ The application uses Azure AI for intelligent image analysis and optimization su
 |------------|-------------|---------------|
 | `AZURE_AI_ENDPOINT` | Your Azure AI endpoint URL | Available in Azure Portal under your Azure AI resource |
 | `AZURE_SECRET_KEY` | Your Azure AI API key | Found in Azure Portal under Keys and Endpoint section |
-| `AZURE_MODEL_NAME` | Model deployment name (e.g., `gpt-4o`) | The name you assigned when deploying the model |
+| `AZURE_AI_DEPLOYMENT_NAME` | Model deployment name (e.g., `gpt-4o`) | The name you assigned when deploying the model |
 
 #### Setting Up Azure AI
 
@@ -48,9 +48,9 @@ For local development, create a `.env` file in the project root:
 
 ```bash
 # Azure AI Configuration (Recommended)
-VITE_AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
-VITE_AZURE_SECRET_KEY=your-azure-key-here
-VITE_AZURE_MODEL_NAME=gpt-4o
+AZURE_AI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_SECRET_KEY=your-azure-key-here
+AZURE_AI_DEPLOYMENT_NAME=gpt-4o
 
 # OR for OpenAI directly
 # OPENAI_API_KEY=sk-your-api-key-here
@@ -165,4 +165,4 @@ For issues related to:
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
 - [GitHub Actions Secrets Documentation](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
-- [Spark Runtime SDK Documentation](https://github.com/github/spark)
+- [Azure OpenAI REST API Reference](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference)

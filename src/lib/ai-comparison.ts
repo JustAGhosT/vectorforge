@@ -1,4 +1,5 @@
 import { parseLLMError } from './utils'
+import { llm, isLLMConfigured } from './llm'
 
 export interface ImageRating {
   /** Visual quality score (0-100) */
@@ -103,13 +104,13 @@ Provide 3-6 key differences. Be specific and constructive.
 Return only valid JSON, no other text.`
 
   try {
-    if (!window.spark || !window.spark.llm) {
+    if (!isLLMConfigured()) {
       throw new Error('AI service not available')
     }
 
     let response: string
     try {
-      response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+      response = await llm(promptText, undefined, true)
     } catch (llmError) {
       throw new Error(parseLLMError(llmError))
     }

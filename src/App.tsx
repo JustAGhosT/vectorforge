@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -72,7 +72,7 @@ function LoadingFallback() {
 
 function App() {
   const isMobile = useIsMobile()
-  const [history, setHistory] = useKV<ConversionJob[]>('conversion-history', [])
+  const [history, setHistory] = useLocalStorage<ConversionJob[]>('conversion-history', [])
   const [isDragging, setIsDragging] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [dividerPosition, setDividerPosition] = useState(50)

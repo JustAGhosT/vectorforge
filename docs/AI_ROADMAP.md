@@ -99,7 +99,7 @@ analyzeImageLocally(imageDataUrl)
     → Extracts colors, complexity, dimensions
     ↓
 analyzeImageWithAI(imageDataUrl, currentSettings, localAnalysis)
-    → Calls window.spark.llm (GPT-4o, JSON mode)
+    → Calls Azure OpenAI API (JSON mode)
     → Parses AI response
     ↓
 AISuggestionCard Component

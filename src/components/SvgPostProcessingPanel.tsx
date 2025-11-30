@@ -24,7 +24,7 @@ import {
   Circle,
   RectangleDashed,
   FileCode,
-  SwapCircle,
+  ArrowsCounterClockwise,
   PaintBucket,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -532,7 +532,7 @@ export function SvgPostProcessingPanel({
                         className="w-6 h-6 rounded border border-border shrink-0"
                         style={{ backgroundColor: selectedColor }}
                       />
-                      <SwapCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <ArrowsCounterClockwise className="w-4 h-4 text-muted-foreground shrink-0" />
                       <Input
                         type="color"
                         value={replacementColor}
