@@ -13,9 +13,63 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-and-deploy:
+  validate-secrets:
+    name: Validate Secrets
     runs-on: ubuntu-latest
-    
+    steps:
+      - name: Check required secrets
+        run: |
+          echo "Validating required secrets..."
+          MISSING=""
+
+          if [ -z "${{ secrets.AZURE_AI_ENDPOINT }}" ]; then
+            echo "::error::AZURE_AI_ENDPOINT secret is not set"
+            MISSING="$MISSING AZURE_AI_ENDPOINT"
+          else
+            echo "✓ AZURE_AI_ENDPOINT is set"
+          fi
+
+          if [ -z "${{ secrets.AZURE_SECRET_KEY }}" ]; then
+            echo "::error::AZURE_SECRET_KEY secret is not set"
+            MISSING="$MISSING AZURE_SECRET_KEY"
+          else
+            echo "✓ AZURE_SECRET_KEY is set"
+          fi
+
+          if [ -z "${{ secrets.AZURE_AI_DEPLOYMENT_NAME }}" ]; then
+            echo "::error::AZURE_AI_DEPLOYMENT_NAME secret is not set"
+            MISSING="$MISSING AZURE_AI_DEPLOYMENT_NAME"
+          else
+            echo "✓ AZURE_AI_DEPLOYMENT_NAME is set"
+          fi
+
+          if [ -z "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN secret is not set"
+            MISSING="$MISSING NETLIFY_AUTH_TOKEN"
+          else
+            echo "✓ NETLIFY_AUTH_TOKEN is set"
+          fi
+
+          if [ -z "${{ secrets.NETLIFY_SITE_ID }}" ]; then
+            echo "::error::NETLIFY_SITE_ID secret is not set"
+            MISSING="$MISSING NETLIFY_SITE_ID"
+          else
+            echo "✓ NETLIFY_SITE_ID is set"
+          fi
+
+          if [ -n "$MISSING" ]; then
+            echo ""
+            echo "::error::Missing secrets:$MISSING"
+            exit 1
+          fi
+
+          echo ""
+          echo "All required secrets are configured!"
+
+  build-and-deploy:
+    needs: validate-secrets
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
