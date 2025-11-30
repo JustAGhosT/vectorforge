@@ -90,7 +90,7 @@ async function validateAzureEndpoint(endpoint: string, apiKey: string, deploymen
 function validateAzureEnvPlugin(): Plugin {
   return {
     name: 'validate-azure-env',
-    buildStart() {
+    async buildStart() {
       // Allow skipping validation for deployments that don't need AI features
       if (process.env.SKIP_AZURE_VALIDATION === 'true') {
         console.log('⚠️  Azure AI validation skipped (SKIP_AZURE_VALIDATION=true)')
