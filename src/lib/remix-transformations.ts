@@ -249,10 +249,11 @@ export function addPathBorder(svg: string, options: PathBorderOptions = {}): str
     strokeLinecap = 'round',
     strokeLinejoin = 'round',
   } = options
-  
+
   return svg.replace(/<path([^>]*)>/gi, (match, attrs) => {
-    // If path already has a stroke, don't add another
-    if (attrs.includes('stroke=')) {
+    // If path already has a stroke attribute (not stroke-width, stroke-dasharray, etc.), don't add another
+    // Use word boundary to avoid matching stroke-width, stroke-dasharray, etc.
+    if (/\bstroke\s*=/.test(attrs)) {
       return match
     }
     return `<path${attrs} stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linecap="${strokeLinecap}" stroke-linejoin="${strokeLinejoin}">`
@@ -301,10 +302,16 @@ export function addShadow(svg: string, options: ShadowOptions = {}): string {
  */
 export function applyTransform(svg: string, options: TransformOptions = {}): string {
   const { scale = 1, rotate = 0, flipX = false, flipY = false } = options
-  
+
+  // Validate scale bounds (prevent extreme values)
+  const safeScale = Math.max(0.1, Math.min(10, scale))
+
+  // Normalize rotation to 0-360 range
+  const safeRotate = ((rotate % 360) + 360) % 360
+
   const dims = getSvgDimensions(svg)
   if (!dims) return svg
-  
+
   const contentMatch = svg.match(/<svg[^>]*>([\s\S]*)<\/svg>/i)
   if (!contentMatch) return svg
   
@@ -312,17 +319,17 @@ export function applyTransform(svg: string, options: TransformOptions = {}): str
   const { width, height } = dims
   
   const transforms: string[] = []
-  
+
   // Center for rotation and flipping
   const cx = width / 2
   const cy = height / 2
-  
-  if (rotate !== 0) {
-    transforms.push(`rotate(${rotate} ${cx} ${cy})`)
+
+  if (safeRotate !== 0) {
+    transforms.push(`rotate(${safeRotate} ${cx} ${cy})`)
   }
-  
-  if (scale !== 1) {
-    transforms.push(`translate(${cx} ${cy}) scale(${scale}) translate(${-cx} ${-cy})`)
+
+  if (safeScale !== 1) {
+    transforms.push(`translate(${cx} ${cy}) scale(${safeScale}) translate(${-cx} ${-cy})`)
   }
   
   if (flipX) {

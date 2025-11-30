@@ -143,8 +143,9 @@ function removeEmptyElements(svg: string): string {
  * Simplify path data by reducing decimal precision
  */
 function simplifyPaths(svg: string, precision = 2): string {
+  // Match numbers with 2+ decimal places for consistent simplification
   return svg.replace(
-    /(\d+\.\d{3,})/g,
+    /(\d+\.\d{2,})/g,
     (match) => parseFloat(match).toFixed(precision)
   )
 }
@@ -156,8 +157,11 @@ function optimizeGroups(svg: string): string {
   // Remove groups that only contain a single child
   let result = svg
   let changed = true
-  
-  while (changed) {
+  let iterations = 0
+  const MAX_ITERATIONS = 100 // Prevent infinite loops on malformed SVG
+
+  while (changed && iterations < MAX_ITERATIONS) {
+    iterations++
     const before = result
     result = result.replace(
       /<g([^>]*)>\s*(<(?:path|circle|rect|polygon|polyline|ellipse|line)[^>]*\/?>\s*)<\/g>/gi,
@@ -169,7 +173,7 @@ function optimizeGroups(svg: string): string {
     )
     changed = before !== result
   }
-  
+
   return result
 }
 

@@ -62,23 +62,45 @@ export function SvgPostProcessingPanel({
     return getSvgInfo(currentSvg)
   }, [currentSvg, getSvgInfo])
 
+  // Helper to handle transformation results with proper feedback
+  const applyWithFeedback = useCallback((
+    modified: string,
+    successTitle: string,
+    successDesc: string,
+    noChangeTitle: string
+  ) => {
+    if (modified === currentSvg) {
+      toast.info('No changes detected', {
+        description: `${noChangeTitle} - SVG unchanged`,
+      })
+      onActivityLog?.(noChangeTitle, 'No changes - SVG unchanged')
+    } else {
+      onApplyChange(modified)
+      onActivityLog?.(successTitle, successDesc)
+      toast.success(successTitle, {
+        description: successDesc,
+      })
+    }
+  }, [currentSvg, onApplyChange, onActivityLog])
+
   // Background removal
   const handleRemoveBackground = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, { removeBackground: true })
-    onApplyChange(modified)
-    onActivityLog?.('Removed background', 'White/light background elements removed')
-    toast.success('Background removed', {
-      description: 'White and light-colored backgrounds have been removed',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'Background removed',
+      'White/light background elements removed',
+      'Remove Background'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   // Add border
   const handleAddBorder = useCallback(() => {
     if (!currentSvg) return
-    
-    const modified = modifySvg(currentSvg, { 
+
+    const modified = modifySvg(currentSvg, {
       addBorder: {
         type: borderType,
         color: borderColor,
@@ -86,60 +108,65 @@ export function SvgPostProcessingPanel({
         padding: borderPadding,
       }
     })
-    onApplyChange(modified)
-    onActivityLog?.(`Added ${borderType} border`, `${borderColor} border with ${borderWidth}px stroke`)
-    toast.success('Border added', {
-      description: `${borderType === 'circle' ? 'Circle' : 'Rounded'} border has been added`,
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog, borderType, borderColor, borderWidth, borderPadding])
+    applyWithFeedback(
+      modified,
+      'Border added',
+      `${borderType === 'circle' ? 'Circle' : 'Rounded'} border with ${borderWidth}px stroke`,
+      'Add Border'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback, borderType, borderColor, borderWidth, borderPadding])
 
   const handleRemoveColorBlocks = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, { removePotraceBlocks: true })
-    onApplyChange(modified)
-    onActivityLog?.('Removed color blocks', 'Merged similar adjacent color regions')
-    toast.success('Color blocks removed', {
-      description: 'Similar colors have been merged',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'Color blocks merged',
+      'Similar adjacent color regions merged',
+      'Merge Colors'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   const handleSimplifyPaths = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, { simplifyPaths: true })
-    onApplyChange(modified)
-    onActivityLog?.('Simplified paths', 'Reduced path precision for smaller file size')
-    toast.success('Paths simplified', {
-      description: 'Path precision has been reduced',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'Paths simplified',
+      'Path precision reduced for smaller file size',
+      'Simplify Paths'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   const handleOptimizeGroups = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, { optimizeGroups: true })
-    onApplyChange(modified)
-    onActivityLog?.('Optimized groups', 'Removed unnecessary nested groups')
-    toast.success('Groups optimized', {
-      description: 'Unnecessary groups have been removed',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'Groups optimized',
+      'Unnecessary nested groups removed',
+      'Optimize Groups'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   const handleRemoveEmptyElements = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, { removeEmptyElements: true })
-    onApplyChange(modified)
-    onActivityLog?.('Removed empty elements', 'Cleaned up empty SVG elements')
-    toast.success('Empty elements removed', {
-      description: 'SVG has been cleaned up',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'Empty elements removed',
+      'SVG has been cleaned up',
+      'Remove Empty Elements'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   const handleFullOptimization = useCallback(() => {
     if (!currentSvg) return
-    
+
     const modified = modifySvg(currentSvg, {
       removeBackground: true,
       removePotraceBlocks: true,
@@ -147,20 +174,21 @@ export function SvgPostProcessingPanel({
       optimizeGroups: true,
       removeEmptyElements: true,
     })
-    onApplyChange(modified)
-    onActivityLog?.('Full SVG optimization', 'Applied all optimization techniques including background removal')
-    toast.success('SVG fully optimized', {
-      description: 'All optimizations have been applied',
-    })
-  }, [currentSvg, modifySvg, onApplyChange, onActivityLog])
+    applyWithFeedback(
+      modified,
+      'SVG fully optimized',
+      'All optimizations applied including background removal',
+      'Full Optimization'
+    )
+  }, [currentSvg, modifySvg, applyWithFeedback])
 
   if (!currentSvg) {
     return (
       <Card className={cn('', className)}>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-orange/10 rounded-md">
-              <MagicWand className="w-4 h-4 text-orange" weight="fill" />
+            <div className="p-1.5 bg-orange-500/10 rounded-md">
+              <MagicWand className="w-4 h-4 text-orange-500" weight="fill" />
             </div>
             <div>
               <CardTitle className="text-base">Post-Processing</CardTitle>
@@ -188,8 +216,8 @@ export function SvgPostProcessingPanel({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-orange/10 rounded-md">
-              <MagicWand className="w-4 h-4 text-orange" weight="fill" />
+            <div className="p-1.5 bg-orange-500/10 rounded-md">
+              <MagicWand className="w-4 h-4 text-orange-500" weight="fill" />
             </div>
             <div>
               <CardTitle className="text-base">Post-Processing</CardTitle>
@@ -367,7 +395,7 @@ export function SvgPostProcessingPanel({
         <Collapsible>
           <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 text-sm font-semibold hover:text-primary transition-colors">
             <div className="flex items-center gap-2">
-              <MagicWand weight="bold" className="w-4 h-4 text-orange" />
+              <MagicWand weight="bold" className="w-4 h-4 text-orange-500" />
               Optimization
             </div>
             <CaretDown className="w-4 h-4" />
@@ -398,7 +426,7 @@ export function SvgPostProcessingPanel({
                 disabled={isProcessing}
               >
                 <div className="flex items-center gap-1.5 text-xs font-medium">
-                  <Path className="w-3.5 h-3.5 text-cyan" weight="fill" />
+                  <Path className="w-3.5 h-3.5 text-cyan-500" weight="fill" />
                   Simplify Paths
                 </div>
                 <p className="text-[10px] text-muted-foreground">
@@ -414,7 +442,7 @@ export function SvgPostProcessingPanel({
                 disabled={isProcessing}
               >
                 <div className="flex items-center gap-1.5 text-xs font-medium">
-                  <Stack className="w-3.5 h-3.5 text-orange" weight="fill" />
+                  <Stack className="w-3.5 h-3.5 text-orange-500" weight="fill" />
                   Optimize Groups
                 </div>
                 <p className="text-[10px] text-muted-foreground">
