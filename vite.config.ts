@@ -34,9 +34,9 @@ function validateAzureEnvPlugin(): Plugin {
         )
       }
 
-      // Validate the endpoint URL format
-      const endpoint = process.env.AZURE_AI_ENDPOINT
-      if (endpoint && !endpoint.startsWith('https://')) {
+      // Validate the endpoint URL format (only runs if all required vars are present)
+      const endpoint = process.env.AZURE_AI_ENDPOINT!
+      if (!endpoint.startsWith('https://')) {
         throw new Error(
           `Build failed: AZURE_AI_ENDPOINT must start with 'https://'. ` +
           `Got: ${endpoint}`
