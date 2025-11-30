@@ -20,6 +20,9 @@ import {
   FrameCorners,
   Circle,
   RectangleDashed,
+  FileCode,
+  ArrowDown,
+  ArrowUp,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useSvgModification, type SvgModificationOptions } from '@/hooks/use-svg-modification'
@@ -30,6 +33,18 @@ interface SvgPostProcessingPanelProps {
   onApplyChange: (newSvg: string) => void
   onActivityLog?: (title: string, description: string) => void
   className?: string
+}
+
+// Helper to format file size
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
+// Helper to get SVG file size in bytes
+function getSvgSize(svg: string): number {
+  return new Blob([svg]).size
 }
 
 // Border color presets
@@ -59,7 +74,11 @@ export function SvgPostProcessingPanel({
   
   const svgInfo = useMemo(() => {
     if (!currentSvg) return null
-    return getSvgInfo(currentSvg)
+    const info = getSvgInfo(currentSvg)
+    return {
+      ...info,
+      size: getSvgSize(currentSvg),
+    }
   }, [currentSvg, getSvgInfo])
 
   // Helper to handle transformation results with proper feedback
@@ -67,18 +86,27 @@ export function SvgPostProcessingPanel({
     modified: string,
     successTitle: string,
     successDesc: string,
-    noChangeTitle: string
+    noChangeReason: string
   ) => {
     if (modified === currentSvg) {
       toast.info('No changes detected', {
-        description: `${noChangeTitle} - SVG unchanged`,
+        description: noChangeReason,
       })
-      onActivityLog?.(noChangeTitle, 'No changes - SVG unchanged')
+      onActivityLog?.('No changes', noChangeReason)
     } else {
+      const oldSize = getSvgSize(currentSvg!)
+      const newSize = getSvgSize(modified)
+      const sizeDiff = oldSize - newSize
+      const sizeInfo = sizeDiff > 0
+        ? ` (saved ${formatFileSize(sizeDiff)})`
+        : sizeDiff < 0
+          ? ` (added ${formatFileSize(Math.abs(sizeDiff))})`
+          : ''
+
       onApplyChange(modified)
-      onActivityLog?.(successTitle, successDesc)
+      onActivityLog?.(successTitle, `${successDesc}${sizeInfo}`)
       toast.success(successTitle, {
-        description: successDesc,
+        description: `${successDesc}${sizeInfo}`,
       })
     }
   }, [currentSvg, onApplyChange, onActivityLog])
@@ -92,7 +120,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Background removed',
       'White/light background elements removed',
-      'Remove Background'
+      'No white/light background found covering the full SVG'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -112,7 +140,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Border added',
       `${borderType === 'circle' ? 'Circle' : 'Rounded'} border with ${borderWidth}px stroke`,
-      'Add Border'
+      'Could not add border - SVG may be missing dimensions'
     )
   }, [currentSvg, modifySvg, applyWithFeedback, borderType, borderColor, borderWidth, borderPadding])
 
@@ -124,7 +152,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Color blocks merged',
       'Similar adjacent color regions merged',
-      'Merge Colors'
+      'No similar color regions found to merge'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -136,7 +164,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Paths simplified',
       'Path precision reduced for smaller file size',
-      'Simplify Paths'
+      'Paths already simplified or no decimal values found'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -148,7 +176,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Groups optimized',
       'Unnecessary nested groups removed',
-      'Optimize Groups'
+      'No single-child groups found to optimize'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -160,7 +188,7 @@ export function SvgPostProcessingPanel({
       modified,
       'Empty elements removed',
       'SVG has been cleaned up',
-      'Remove Empty Elements'
+      'No empty elements found in SVG'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -178,7 +206,7 @@ export function SvgPostProcessingPanel({
       modified,
       'SVG fully optimized',
       'All optimizations applied including background removal',
-      'Full Optimization'
+      'SVG is already fully optimized'
     )
   }, [currentSvg, modifySvg, applyWithFeedback])
 
@@ -233,6 +261,10 @@ export function SvgPostProcessingPanel({
         {/* SVG Stats */}
         {svgInfo && (
           <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="gap-1.5 text-xs">
+              <FileCode className="w-3 h-3" weight="bold" />
+              {formatFileSize(svgInfo.size)}
+            </Badge>
             <Badge variant="secondary" className="gap-1.5 text-xs">
               <Path className="w-3 h-3" weight="bold" />
               {svgInfo.pathCount} paths
