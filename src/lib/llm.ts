@@ -59,7 +59,7 @@ export async function llm(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'api-key': config.apiKey
+      'Authorization': `Bearer ${config.apiKey}`
     },
     body: JSON.stringify(body)
   })
