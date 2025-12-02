@@ -143,13 +143,31 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       // Check named colors
       if (normalizedColor === 'white') { r = 255; g = 255; b = 255 }
       else if (normalizedColor === 'black') { r = 0; g = 0; b = 0 }
-      // Common light background colors (expanded list)
-      else if (['#fff', '#ffffff', '#fefefe', '#fafafa', '#f0f0f0', '#efefef', '#e0e0e0'].includes(normalizedColor)) { 
+      // Common light background colors
+      else if (['#fff', '#ffffff', '#fefefe'].includes(normalizedColor)) { 
         r = 255; g = 255; b = 255 
       }
-      // Common dark background colors (expanded list)
-      else if (['#000', '#000000', '#111', '#111111', '#0a0a0a', '#0f0f0f'].includes(normalizedColor)) { 
+      else if (normalizedColor === '#fafafa') {
+        r = 250; g = 250; b = 250
+      }
+      else if (normalizedColor === '#f0f0f0') {
+        r = 240; g = 240; b = 240
+      }
+      else if (normalizedColor === '#efefef') {
+        r = 239; g = 239; b = 239
+      }
+      else if (normalizedColor === '#e0e0e0') {
+        r = 224; g = 224; b = 224
+      }
+      // Common dark background colors
+      else if (['#000', '#000000'].includes(normalizedColor)) { 
         r = 0; g = 0; b = 0 
+      }
+      else if (['#111', '#111111', '#0f0f0f'].includes(normalizedColor)) {
+        r = 15; g = 15; b = 15
+      }
+      else if (normalizedColor === '#0a0a0a') {
+        r = 10; g = 10; b = 10
       }
       else {
         // Parse RGB format
@@ -181,12 +199,12 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       if (r < 0) return false
 
       // Check for light backgrounds
-      if (remove && r > LIGHT_THRESHOLD && g > LIGHT_THRESHOLD && b > LIGHT_THRESHOLD) {
+      if (remove && r >= LIGHT_THRESHOLD && g >= LIGHT_THRESHOLD && b >= LIGHT_THRESHOLD) {
         return true
       }
 
       // Check for dark backgrounds
-      if (removeDark && r < DARK_THRESHOLD && g < DARK_THRESHOLD && b < DARK_THRESHOLD) {
+      if (removeDark && r <= DARK_THRESHOLD && g <= DARK_THRESHOLD && b <= DARK_THRESHOLD) {
         return true
       }
 
@@ -350,7 +368,7 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
     )
 
     // Clean up any resulting empty lines
-    result = result.replace(/\n\s*\n+/g, '\n')
+    result = result.replace(/\n\s*\n/g, '\n')
 
     return result
   }

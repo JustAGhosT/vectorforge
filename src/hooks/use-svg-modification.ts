@@ -260,10 +260,10 @@ function removeBackground(svg: string, includeDark = false): string {
     // If color was parsed successfully
     if (r >= 0) {
       // Check for light backgrounds
-      if (r > LIGHT_THRESHOLD && g > LIGHT_THRESHOLD && b > LIGHT_THRESHOLD) return true
+      if (r >= LIGHT_THRESHOLD && g >= LIGHT_THRESHOLD && b >= LIGHT_THRESHOLD) return true
 
       // Check for dark backgrounds (only if includeDark is true)
-      if (includeDark && r < DARK_THRESHOLD && g < DARK_THRESHOLD && b < DARK_THRESHOLD) return true
+      if (includeDark && r <= DARK_THRESHOLD && g <= DARK_THRESHOLD && b <= DARK_THRESHOLD) return true
     }
 
     return false
@@ -432,7 +432,7 @@ function removeBackground(svg: string, includeDark = false): string {
   )
   
   // Clean up any resulting empty lines
-  result = result.replace(/\n\s*\n+/g, '\n')
+  result = result.replace(/\n\s*\n/g, '\n')
   
   return result
 }
