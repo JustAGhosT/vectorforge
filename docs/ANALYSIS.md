@@ -175,16 +175,9 @@ function validateImageFile(file: File): ValidationResult {
 
 ### Background Removal
 Intelligent background removal that:
-- Detects and removes full-coverage white/light rectangles (lowered threshold to RGB > 240 for better detection)
-- Identifies background colors including light grays (#f0f0f0, #e0e0e0) and near-white shades
-- Works with multiple element types:
-  - `<rect>` elements with background colors
-  - `<circle>` and `<ellipse>` elements covering the SVG area
-  - `<polygon>` elements forming backgrounds
-  - Rectangular `<path>` elements with improved dimension checking
-- Reduces coverage requirement from 95% to 90% for more realistic background detection
-- Allows 5px or 5% margin for background element positioning
-- Optionally removes dark backgrounds (RGB < 15) when enabled
+- Detects and removes full-coverage white/light rectangles
+- Identifies background colors close to white (RGB > 245)
+- Works with both `<rect>` elements and rectangular `<path>` elements
 - Preserves actual content while removing background
 
 ### Border Addition

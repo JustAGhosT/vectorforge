@@ -116,20 +116,10 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
     const dims = getSvgDimensions(svg)
     const svgWidth = dims?.width || 0
     const svgHeight = dims?.height || 0
-    
-    // Extract viewBox origin if present
-    const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/i)
-    let viewBoxX = 0
-    let viewBoxY = 0
-    if (viewBoxMatch) {
-      const parts = viewBoxMatch[1].split(/\s+/)
-      viewBoxX = parseFloat(parts[0]) || 0
-      viewBoxY = parseFloat(parts[1]) || 0
-    }
 
-    // Thresholds for background detection (lowered to catch more cases)
-    const LIGHT_THRESHOLD = 240  // Near-white colors
-    const DARK_THRESHOLD = 15    // Near-black colors
+    // Thresholds for background detection
+    const LIGHT_THRESHOLD = 245  // Near-white colors
+    const DARK_THRESHOLD = 10    // Near-black colors
 
     // Check if a color is a background-like color
     const isBackgroundColor = (fillColor: string): boolean => {
@@ -144,31 +134,9 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       if (normalizedColor === 'white') { r = 255; g = 255; b = 255 }
       else if (normalizedColor === 'black') { r = 0; g = 0; b = 0 }
       // Common light background colors
-      else if (['#fff', '#ffffff', '#fefefe'].includes(normalizedColor)) { 
-        r = 255; g = 255; b = 255 
-      }
-      else if (normalizedColor === '#fafafa') {
-        r = 250; g = 250; b = 250
-      }
-      else if (normalizedColor === '#f0f0f0') {
-        r = 240; g = 240; b = 240
-      }
-      else if (normalizedColor === '#efefef') {
-        r = 239; g = 239; b = 239
-      }
-      else if (normalizedColor === '#e0e0e0') {
-        r = 224; g = 224; b = 224
-      }
+      else if (['#fff', '#ffffff', '#fefefe', '#fafafa'].includes(normalizedColor)) { r = 255; g = 255; b = 255 }
       // Common dark background colors
-      else if (['#000', '#000000'].includes(normalizedColor)) { 
-        r = 0; g = 0; b = 0 
-      }
-      else if (['#111', '#111111', '#0f0f0f'].includes(normalizedColor)) {
-        r = 15; g = 15; b = 15
-      }
-      else if (normalizedColor === '#0a0a0a') {
-        r = 10; g = 10; b = 10
-      }
+      else if (['#000', '#000000', '#111', '#111111', '#0a0a0a'].includes(normalizedColor)) { r = 0; g = 0; b = 0 }
       else {
         // Parse RGB format
         const rgbMatch = normalizedColor.match(/rgb\((\d+),(\d+),(\d+)\)/i)
@@ -199,12 +167,12 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       if (r < 0) return false
 
       // Check for light backgrounds
-      if (remove && r >= LIGHT_THRESHOLD && g >= LIGHT_THRESHOLD && b >= LIGHT_THRESHOLD) {
+      if (remove && r > LIGHT_THRESHOLD && g > LIGHT_THRESHOLD && b > LIGHT_THRESHOLD) {
         return true
       }
 
       // Check for dark backgrounds
-      if (removeDark && r <= DARK_THRESHOLD && g <= DARK_THRESHOLD && b <= DARK_THRESHOLD) {
+      if (removeDark && r < DARK_THRESHOLD && g < DARK_THRESHOLD && b < DARK_THRESHOLD) {
         return true
       }
 
@@ -229,46 +197,13 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       const w = wMatch ? parseFloat(wMatch[1]) : 0
       const h = hMatch ? parseFloat(hMatch[1]) : 0
 
-      // Lowered threshold to 90% to catch more realistic background cases
+      // If rect starts at/near 0,0 and covers most of the SVG (95%+)
       if (svgWidth > 0 && svgHeight > 0) {
-        const xThreshold = Math.max(5, svgWidth * 0.05) // Allow 5px or 5% margin
-        const yThreshold = Math.max(5, svgHeight * 0.05)
-        if (x <= viewBoxX + xThreshold && y <= viewBoxY + yThreshold && 
-            w >= svgWidth * 0.9 && h >= svgHeight * 0.9) {
+        if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
           return true
         }
       }
 
-      return false
-    }
-
-    // Check if a circle or ellipse covers most of the SVG area
-    const isFullCoverCircle = (circleStr: string): boolean => {
-      const cxMatch = circleStr.match(/\bcx=["']([^"']+)["']/i)
-      const cyMatch = circleStr.match(/\bcy=["']([^"']+)["']/i)
-      const rMatch = circleStr.match(/\br=["']([^"']+)["']/i)
-      const rxMatch = circleStr.match(/\brx=["']([^"']+)["']/i)
-      const ryMatch = circleStr.match(/\bry=["']([^"']+)["']/i)
-
-      const cx = cxMatch ? parseFloat(cxMatch[1]) : 0
-      const cy = cyMatch ? parseFloat(cyMatch[1]) : 0
-      const r = rMatch ? parseFloat(rMatch[1]) : 0
-      const rx = rxMatch ? parseFloat(rxMatch[1]) : r
-      const ry = ryMatch ? parseFloat(ryMatch[1]) : r
-
-      if (svgWidth > 0 && svgHeight > 0 && (r > 0 || (rx > 0 && ry > 0))) {
-        // Check if circle is centered and radius covers most of the SVG
-        const centerX = viewBoxX + svgWidth / 2
-        const centerY = viewBoxY + svgHeight / 2
-        const maxRadius = Math.max(svgWidth, svgHeight) / 2
-
-        // Allow 10% margin for circle detection
-        if (Math.abs(cx - centerX) < svgWidth * 0.1 && 
-            Math.abs(cy - centerY) < svgHeight * 0.1 &&
-            (r >= maxRadius * 0.85 || (rx >= svgWidth * 0.85 / 2 && ry >= svgHeight * 0.85 / 2))) {
-          return true
-        }
-      }
       return false
     }
 
@@ -288,20 +223,6 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
       }
     )
 
-    // Remove full-coverage circles and ellipses with background colors
-    result = result.replace(
-      /<(circle|ellipse)[^>]*>/gi,
-      (match) => {
-        const fillMatch = match.match(/fill=["']([^"']+)["']/i)
-        const fill = fillMatch ? fillMatch[1] : ''
-
-        if (isBackgroundColor(fill) && isFullCoverCircle(match)) {
-          return '' // Remove the background circle/ellipse
-        }
-        return match
-      }
-    )
-
     // Also check for path elements that might be background rectangles
     result = result.replace(
       /<path[^>]*d=["']([^"']+)["'][^>]*>/gi,
@@ -309,59 +230,11 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
         const fillMatch = match.match(/fill=["']([^"']+)["']/i)
         const fill = fillMatch ? fillMatch[1] : ''
 
-        // Check if the path is a simple rectangle pattern (more flexible regex)
-        const isRectPath = /^M\s*[\d.-]+[\s,]+[\d.-]+[\s,]*[HhLlVv].*[HhLlVv].*[Zz]?\s*$/i.test(dAttr.trim())
+        // Check if the path is a simple rectangle pattern
+        const isRectPath = /^M\s*0[\s,]+0[\s,]*[HhLl].*[VvLl].*[HhLl].*[Zz]?\s*$/i.test(dAttr.trim())
 
         if (isBackgroundColor(fill) && isRectPath) {
-          // Check if path data suggests it covers most of the SVG by examining bounds
-          const coords = dAttr.match(/[\d.]+/g)?.map(parseFloat) || []
-          if (coords.length >= 4 && svgWidth > 0 && svgHeight > 0) {
-            // Extract approximate bounds from coordinates
-            const xCoords = coords.filter((_, i) => i % 2 === 0)
-            const yCoords = coords.filter((_, i) => i % 2 === 1)
-            const minX = Math.min(...xCoords)
-            const maxX = Math.max(...xCoords)
-            const minY = Math.min(...yCoords)
-            const maxY = Math.max(...yCoords)
-            const pathWidth = maxX - minX
-            const pathHeight = maxY - minY
-            
-            // Check if path covers most of the SVG (90%+)
-            if (pathWidth >= svgWidth * 0.9 && pathHeight >= svgHeight * 0.9) {
-              return '' // Remove the background path
-            }
-          }
-        }
-        return match
-      }
-    )
-
-    // Remove background polygons (less common but still worth checking)
-    result = result.replace(
-      /<polygon[^>]*>/gi,
-      (match) => {
-        const fillMatch = match.match(/fill=["']([^"']+)["']/i)
-        const fill = fillMatch ? fillMatch[1] : ''
-        const pointsMatch = match.match(/points=["']([^"']+)["']/i)
-
-        if (isBackgroundColor(fill) && pointsMatch && svgWidth > 0 && svgHeight > 0) {
-          const points = pointsMatch[1].split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n))
-          if (points.length >= 6) { // At least 3 points (x,y pairs)
-            // Check if polygon covers most of the SVG by checking bounds
-            const xCoords = points.filter((_, i) => i % 2 === 0)
-            const yCoords = points.filter((_, i) => i % 2 === 1)
-            const minX = Math.min(...xCoords)
-            const maxX = Math.max(...xCoords)
-            const minY = Math.min(...yCoords)
-            const maxY = Math.max(...yCoords)
-
-            const polyWidth = maxX - minX
-            const polyHeight = maxY - minY
-
-            if (polyWidth >= svgWidth * 0.85 && polyHeight >= svgHeight * 0.85) {
-              return '' // Remove the background polygon
-            }
-          }
+          return '' // Remove the background path
         }
         return match
       }
