@@ -184,6 +184,7 @@ function optimizeGroups(svg: string): string {
  * 1. The first/largest rectangle covering the entire viewBox
  * 2. Elements with fill colors close to white/light gray
  * 3. Elements with fill="white" or fill="#fff*"
+ * 4. Circles, ellipses, or polygons that cover the full area
  * @param svg - The SVG string to process
  * @param includeDark - Also remove dark/black backgrounds
  */
@@ -195,9 +196,13 @@ function removeBackground(svg: string, includeDark = false): string {
   
   let svgWidth = 0
   let svgHeight = 0
+  let viewBoxX = 0
+  let viewBoxY = 0
   
   if (viewBoxMatch) {
     const parts = viewBoxMatch[1].split(/\s+/)
+    viewBoxX = parseFloat(parts[0]) || 0
+    viewBoxY = parseFloat(parts[1]) || 0
     svgWidth = parseFloat(parts[2]) || 0
     svgHeight = parseFloat(parts[3]) || 0
   } else if (widthMatch && heightMatch) {
@@ -206,8 +211,8 @@ function removeBackground(svg: string, includeDark = false): string {
   }
   
   // Thresholds for considering a color as "background"
-  const LIGHT_THRESHOLD = 245  // Near-white
-  const DARK_THRESHOLD = 10    // Near-black
+  const LIGHT_THRESHOLD = 240  // Near-white (lowered from 245 to catch more light backgrounds)
+  const DARK_THRESHOLD = 15    // Near-black (raised from 10 to catch more dark backgrounds)
 
   // Check if a color is a background-like color
   const isBackgroundColor = (color: string): boolean => {
@@ -216,12 +221,12 @@ function removeBackground(svg: string, includeDark = false): string {
     const normalizedColor = color.toLowerCase().replace(/\s/g, '')
 
     // Common light background colors
-    const lightBgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', 'rgb(255,255,255)', 'rgb(255,255,255)']
+    const lightBgColors = ['white', '#fff', '#ffffff', '#fefefe', '#fafafa', '#f0f0f0', '#efefef', '#e0e0e0', 'rgb(255,255,255)', 'rgb(254,254,254)', 'rgb(250,250,250)', 'rgb(240,240,240)']
     if (lightBgColors.includes(normalizedColor)) return true
 
     // Common dark background colors (only check if includeDark is true)
     if (includeDark) {
-      const darkBgColors = ['black', '#000', '#000000', '#111', '#111111', '#0a0a0a', 'rgb(0,0,0)']
+      const darkBgColors = ['black', '#000', '#000000', '#111', '#111111', '#0a0a0a', '#0f0f0f', 'rgb(0,0,0)', 'rgb(10,10,10)', 'rgb(15,15,15)']
       if (darkBgColors.includes(normalizedColor)) return true
     }
 
@@ -281,9 +286,43 @@ function removeBackground(svg: string, includeDark = false): string {
     const w = wMatch ? parseFloat(wMatch[1]) : 0
     const h = hMatch ? parseFloat(hMatch[1]) : 0
 
-    // If rect starts at/near 0,0 and covers most of the SVG (95%+)
+    // If rect starts at/near viewBox origin and covers most of the SVG (90%+ instead of 95%)
+    // Lowered threshold to catch more realistic background cases
     if (svgWidth > 0 && svgHeight > 0) {
-      if (x <= 1 && y <= 1 && w >= svgWidth * 0.95 && h >= svgHeight * 0.95) {
+      const xThreshold = Math.max(5, svgWidth * 0.05) // Allow 5px or 5% margin
+      const yThreshold = Math.max(5, svgHeight * 0.05)
+      if (x <= viewBoxX + xThreshold && y <= viewBoxY + yThreshold && 
+          w >= svgWidth * 0.9 && h >= svgHeight * 0.9) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // Check if a circle or ellipse covers most of the SVG area
+  const isFullCoverCircle = (circleStr: string): boolean => {
+    const cxMatch = circleStr.match(/\bcx=["']([^"']+)["']/i)
+    const cyMatch = circleStr.match(/\bcy=["']([^"']+)["']/i)
+    const rMatch = circleStr.match(/\br=["']([^"']+)["']/i)
+    const rxMatch = circleStr.match(/\brx=["']([^"']+)["']/i)
+    const ryMatch = circleStr.match(/\bry=["']([^"']+)["']/i)
+
+    const cx = cxMatch ? parseFloat(cxMatch[1]) : 0
+    const cy = cyMatch ? parseFloat(cyMatch[1]) : 0
+    const r = rMatch ? parseFloat(rMatch[1]) : 0
+    const rx = rxMatch ? parseFloat(rxMatch[1]) : r
+    const ry = ryMatch ? parseFloat(ryMatch[1]) : r
+
+    if (svgWidth > 0 && svgHeight > 0 && (r > 0 || (rx > 0 && ry > 0))) {
+      // Check if circle is centered and radius covers most of the SVG
+      const centerX = viewBoxX + svgWidth / 2
+      const centerY = viewBoxY + svgHeight / 2
+      const maxRadius = Math.max(svgWidth, svgHeight) / 2
+
+      // Allow 10% margin for circle detection
+      if (Math.abs(cx - centerX) < svgWidth * 0.1 && 
+          Math.abs(cy - centerY) < svgHeight * 0.1 &&
+          (r >= maxRadius * 0.85 || (rx >= svgWidth * 0.85 / 2 && ry >= svgHeight * 0.85 / 2))) {
         return true
       }
     }
@@ -291,6 +330,7 @@ function removeBackground(svg: string, includeDark = false): string {
   }
   
   let result = svg
+  let changesMade = false
   
   // Remove full-coverage rectangles with background colors
   result = result.replace(
@@ -300,7 +340,23 @@ function removeBackground(svg: string, includeDark = false): string {
       const fill = fillMatch ? fillMatch[1] : ''
       
       if (isBackgroundColor(fill) && isFullCoverRect(match)) {
+        changesMade = true
         return '' // Remove the background rect
+      }
+      return match
+    }
+  )
+  
+  // Remove full-coverage circles and ellipses with background colors
+  result = result.replace(
+    /<(circle|ellipse)[^>]*>/gi,
+    (match) => {
+      const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+      const fill = fillMatch ? fillMatch[1] : ''
+      
+      if (isBackgroundColor(fill) && isFullCoverCircle(match)) {
+        changesMade = true
+        return '' // Remove the background circle/ellipse
       }
       return match
     }
@@ -316,18 +372,58 @@ function removeBackground(svg: string, includeDark = false): string {
       
       // Check if the path is a simple rectangle covering the full area
       // Simple rectangular paths have patterns like "M0 0H{width}V{height}H0Z" or similar
-      const isRectPath = /^M\s*0[\s,]+0[\s,]*[HhLl].*[VvLl].*[HhLl].*[Zz]?\s*$/i.test(dAttr.trim())
+      const isRectPath = /^M\s*[\d.-]+[\s,]+[\d.-]+[\s,]*[HhLlVv].*[HhLlVv].*[Zz]?\s*$/i.test(dAttr.trim())
       
       if (isBackgroundColor(fill) && isRectPath) {
-        // Additionally verify it covers significant area by path commands
-        return '' // Remove the background path
+        // Additionally check if path data suggests it covers most of the SVG
+        const coords = dAttr.match(/[\d.]+/g)?.map(parseFloat) || []
+        if (coords.length >= 4 && svgWidth > 0 && svgHeight > 0) {
+          // Check if the path dimensions are close to SVG dimensions
+          const maxCoord = Math.max(...coords)
+          if (maxCoord >= svgWidth * 0.85 || maxCoord >= svgHeight * 0.85) {
+            changesMade = true
+            return '' // Remove the background path
+          }
+        }
+      }
+      return match
+    }
+  )
+  
+  // Remove background polygons (less common but still worth checking)
+  result = result.replace(
+    /<polygon[^>]*>/gi,
+    (match) => {
+      const fillMatch = match.match(/fill=["']([^"']+)["']/i)
+      const fill = fillMatch ? fillMatch[1] : ''
+      const pointsMatch = match.match(/points=["']([^"']+)["']/i)
+      
+      if (isBackgroundColor(fill) && pointsMatch && svgWidth > 0 && svgHeight > 0) {
+        const points = pointsMatch[1].split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n))
+        if (points.length >= 6) { // At least 3 points (x,y pairs)
+          // Check if polygon covers most of the SVG by checking bounds
+          const xCoords = points.filter((_, i) => i % 2 === 0)
+          const yCoords = points.filter((_, i) => i % 2 === 1)
+          const minX = Math.min(...xCoords)
+          const maxX = Math.max(...xCoords)
+          const minY = Math.min(...yCoords)
+          const maxY = Math.max(...yCoords)
+          
+          const polyWidth = maxX - minX
+          const polyHeight = maxY - minY
+          
+          if (polyWidth >= svgWidth * 0.85 && polyHeight >= svgHeight * 0.85) {
+            changesMade = true
+            return '' // Remove the background polygon
+          }
+        }
       }
       return match
     }
   )
   
   // Clean up any resulting empty lines
-  result = result.replace(/\n\s*\n/g, '\n')
+  result = result.replace(/\n\s*\n+/g, '\n')
   
   return result
 }
