@@ -116,8 +116,16 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
     const dims = getSvgDimensions(svg)
     const svgWidth = dims?.width || 0
     const svgHeight = dims?.height || 0
-    const viewBoxX = 0
-    const viewBoxY = 0
+    
+    // Extract viewBox origin if present
+    const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/i)
+    let viewBoxX = 0
+    let viewBoxY = 0
+    if (viewBoxMatch) {
+      const parts = viewBoxMatch[1].split(/\s+/)
+      viewBoxX = parseFloat(parts[0]) || 0
+      viewBoxY = parseFloat(parts[1]) || 0
+    }
 
     // Thresholds for background detection (lowered to catch more cases)
     const LIGHT_THRESHOLD = 240  // Near-white colors
@@ -287,12 +295,21 @@ export function modifyBackground(svg: string, options: BackgroundOptions = {}): 
         const isRectPath = /^M\s*[\d.-]+[\s,]+[\d.-]+[\s,]*[HhLlVv].*[HhLlVv].*[Zz]?\s*$/i.test(dAttr.trim())
 
         if (isBackgroundColor(fill) && isRectPath) {
-          // Additionally check if path data suggests it covers most of the SVG
+          // Check if path data suggests it covers most of the SVG by examining bounds
           const coords = dAttr.match(/[\d.]+/g)?.map(parseFloat) || []
           if (coords.length >= 4 && svgWidth > 0 && svgHeight > 0) {
-            // Check if the path dimensions are close to SVG dimensions
-            const maxCoord = Math.max(...coords)
-            if (maxCoord >= svgWidth * 0.85 || maxCoord >= svgHeight * 0.85) {
+            // Extract approximate bounds from coordinates
+            const xCoords = coords.filter((_, i) => i % 2 === 0)
+            const yCoords = coords.filter((_, i) => i % 2 === 1)
+            const minX = Math.min(...xCoords)
+            const maxX = Math.max(...xCoords)
+            const minY = Math.min(...yCoords)
+            const maxY = Math.max(...yCoords)
+            const pathWidth = maxX - minX
+            const pathHeight = maxY - minY
+            
+            // Check if path covers most of the SVG (90%+)
+            if (pathWidth >= svgWidth * 0.9 && pathHeight >= svgHeight * 0.9) {
               return '' // Remove the background path
             }
           }
