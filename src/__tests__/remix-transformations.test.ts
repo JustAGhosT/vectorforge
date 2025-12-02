@@ -56,6 +56,88 @@ describe('remix-transformations', () => {
       expect(result).not.toContain('width="100%"')
     })
 
+    it('can remove light gray background (#f0f0f0)', () => {
+      const svgWithLightGray = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="0" y="0" width="100" height="100" fill="#f0f0f0"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithLightGray, { remove: true })
+      expect(result).not.toContain('fill="#f0f0f0"')
+      expect(result).toContain('fill="#00FF00"')
+    })
+
+    it('can remove background with 5px margin', () => {
+      const svgWithMargin = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="2" y="2" width="96" height="96" fill="#FFFFFF"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithMargin, { remove: true })
+      expect(result).not.toContain('width="96"')
+    })
+
+    it('can remove circular backgrounds', () => {
+      const svgWithCircleBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="50" fill="#FFFFFF"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithCircleBg, { remove: true })
+      // Should remove the large white circle but keep the green one
+      const circleMatches = result.match(/<circle/g)
+      expect(circleMatches).toBeTruthy()
+      expect(circleMatches!.length).toBe(1)
+      expect(result).toContain('fill="#00FF00"')
+    })
+
+    it('can remove ellipse backgrounds', () => {
+      const svgWithEllipseBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <ellipse cx="50" cy="50" rx="48" ry="48" fill="#FFFFFF"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithEllipseBg, { remove: true })
+      expect(result).not.toContain('<ellipse')
+      expect(result).toContain('fill="#00FF00"')
+    })
+
+    it('can remove polygon backgrounds', () => {
+      const svgWithPolygonBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <polygon points="0,0 100,0 100,100 0,100" fill="#FFFFFF"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithPolygonBg, { remove: true })
+      expect(result).not.toContain('<polygon')
+      expect(result).toContain('fill="#00FF00"')
+    })
+
+    it('can remove dark backgrounds when removeDark is true', () => {
+      const svgWithDarkBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="0" y="0" width="100" height="100" fill="#000000"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithDarkBg, { remove: false, removeDark: true })
+      expect(result).not.toContain('fill="#000000"')
+      expect(result).toContain('fill="#00FF00"')
+    })
+
+    it('does not remove small rectangles', () => {
+      const svgWithSmallRect = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="10" y="10" width="80" height="80" fill="#FFFFFF"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithSmallRect, { remove: true })
+      // Small rect should remain (doesn't cover 90% of SVG)
+      expect(result).toContain('width="80"')
+    })
+
+    it('does not remove colored elements', () => {
+      const svgWithColoredRect = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect x="0" y="0" width="100" height="100" fill="#FF0000"/>
+        <circle cx="50" cy="50" r="20" fill="#00FF00"/>
+      </svg>`
+      const result = modifyBackground(svgWithColoredRect, { remove: true })
+      // Red rect should remain (not a background color)
+      expect(result).toContain('fill="#FF0000"')
+    })
+
     it('can add a background color', () => {
       const result = modifyBackground(sampleSvg, { color: '#FFFFFF' })
       expect(result).toContain('fill="#FFFFFF"')
